@@ -1,5 +1,5 @@
 "use client"
-      
+
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
@@ -666,9 +666,10 @@ export default function ChatPage() {
   // Handle input focus for mobile
   const handleInputFocus = () => {
     setIsKeyboardVisible(true);
+    // Add a small delay to ensure the keyboard animation completes
     setTimeout(() => {
       scrollToBottom();
-    }, 100) // Reduced delay for faster response
+    }, 300);
   }
 
   const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
@@ -694,14 +695,28 @@ export default function ChatPage() {
     const handleViewportChange = () => {
       if (typeof window !== 'undefined' && window.visualViewport) {
         const viewport = window.visualViewport;
-        const isKeyboardOpen = viewport.height < window.innerHeight * 0.85; // More sensitive detection
+        const isKeyboardOpen = viewport.height < window.innerHeight * 0.8; // More sensitive detection
         setIsKeyboardVisible(isKeyboardOpen);
         
         // If keyboard is open, scroll to bottom immediately
         if (isKeyboardOpen) {
           setTimeout(() => {
             scrollToBottom();
-          }, 50);
+          }, 100);
+        }
+      }
+    };
+
+    // Handle resize events for older browsers
+    const handleResize = () => {
+      if (typeof window !== 'undefined' && !window.visualViewport) {
+        const isKeyboardOpen = window.innerHeight < window.outerHeight * 0.8;
+        setIsKeyboardVisible(isKeyboardOpen);
+        
+        if (isKeyboardOpen) {
+          setTimeout(() => {
+            scrollToBottom();
+          }, 100);
         }
       }
     };
@@ -712,6 +727,12 @@ export default function ChatPage() {
         if (window.visualViewport) {
           window.visualViewport.removeEventListener('resize', handleViewportChange);
         }
+      };
+    } else if (typeof window !== 'undefined') {
+      // Fallback for browsers without visualViewport
+      window.addEventListener('resize', handleResize);
+      return () => {
+        window.removeEventListener('resize', handleResize);
       };
     }
   }, []);
@@ -905,6 +926,13 @@ export default function ChatPage() {
           inline: 'nearest'
         });
       }
+      // Also scroll the scroll area to bottom for mobile
+      if (scrollAreaRef.current) {
+        const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollContainer) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+      }
     }, 100); // Small delay to ensure DOM is updated
   };
 
@@ -1095,6 +1123,21 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen bg-gray-50 relative overflow-hidden">
+      {/* Mobile-specific meta viewport styles */}
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          .mobile-safe-area {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+          }
+          .mobile-input-focus {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+          }
+        }
+      `}</style>
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-5 md:hidden" onClick={() => setIsSidebarOpen(false)} />
@@ -1366,19 +1409,22 @@ export default function ChatPage() {
       <div 
         ref={chatContainerRef}
         className={cn(
-          "flex-1 flex flex-col bg-white",
+          "flex-1 flex flex-col bg-white relative",
           isSidebarOpen ? "z-0" : "z-10"
         )}
         style={{
           height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
             ? `${window.visualViewport?.height || window.innerHeight}px` 
-            : "100vh"
+            : "100vh",
+          // Mobile-specific height handling
+          minHeight: "100vh",
+          maxHeight: "100vh",
         }}
       >
         {/* Sticky Header - Always visible with conditional z-index */}
         <div className={cn(
-          "sticky top-0 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95",
-          isSidebarOpen ? "z-0" : "z-40" // Lower z-index when sidebar is open
+          "sticky top-0 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95 z-50",
+          isSidebarOpen ? "z-50" : "z-50" // Always high z-index for mobile
         )}>
           {/* Contact header - Always visible */}
           {selectedContact ? (
@@ -1469,129 +1515,121 @@ export default function ChatPage() {
           )}
         </div>
 
-      {/* Messages - Scrollable area with no extra blank space, responsive to keyboard */}
-      <div className="flex-1 flex flex-col overflow-hidden relative min-h-0">
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <ScrollArea
+        {/* Messages - Scrollable area with proper spacing for sticky footer */}
+        <div className="flex-1 overflow-hidden relative">
+          <ScrollArea 
             ref={scrollAreaRef}
-            className="flex-1 p-4 min-h-0"
-            style={{
-              flex: 1,
-              minHeight: 0,
-              maxHeight: '100%',
-              height: '100%',
-              boxSizing: 'border-box',
-              paddingBottom: isKeyboardVisible ? '80px' : '20px',
-              transition: 'padding-bottom 0.2s',
-            }}
+            className="h-full p-4 pb-24" // Increased bottom padding for mobile
             onScroll={handleScroll}
           >
-          <div className="space-y-4 pb-2">
-            {isLoadingMessages ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span className="text-sm text-gray-500">Loading messages...</span>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <MessageSquare className="h-8 w-8 text-gray-400" />
+            <div className="space-y-4 pb-4">
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-sm text-gray-500">Loading messages...</span>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                <p className="text-sm text-gray-500 max-w-sm">
-                  Start a conversation with {selectedContact?.name || 'your contact'} by sending your first message!
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn("flex mb-4", message.senderId === "me" ? "justify-end" : "justify-start")}
-                >
-                  <div
-                    className={cn(
-                      "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
-                      message.senderId === "me" 
-                        ? "bg-blue-500 text-white rounded-br-md" 
-                        : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
-                    )}
-                  >
-                    {message.type === "text" && (
-                      <p className="text-sm leading-relaxed break-words">{message.content}</p>
-                    )}
-                    {message.type === "image" && message.content && (
-                      <div className="space-y-2">
-                        <img
-                          src={message.content}
-                          alt="Shared image"
-                          className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                          style={{ maxWidth: 240, maxHeight: 320 }}
-                          onClick={() => setPreviewImage(message.content)}
-                        />
-                      </div>
-                    )}
-                    {message.type === "file" && message.content && (
-                      <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
-                        <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <a 
-                            href={message.content} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-sm font-medium underline hover:no-underline block truncate"
-                          >
-                            {message.fileName || 'Download file'}
-                          </a>
-                          <p className="text-xs opacity-70 mt-1">{message.fileSize}</p>
-                        </div>
-                      </div>
-                    )}
-                    <p className={cn(
-                      "text-xs mt-2 opacity-70",
-                      message.senderId === "me" ? "text-right" : "text-left"
-                    )}>
-                      {message.timestamp}
-                    </p>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <MessageSquare className="h-8 w-8 text-gray-400" />
                   </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+                  <p className="text-sm text-gray-500 max-w-sm">
+                    Start a conversation with {selectedContact?.name || 'your contact'} by sending your first message!
+                  </p>
                 </div>
-              ))
-            )}
-            <div ref={messagesEndRef} className="h-2" />
-          </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn("flex mb-4", message.senderId === "me" ? "justify-end" : "justify-start")}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
+                        message.senderId === "me" 
+                          ? "bg-blue-500 text-white rounded-br-md" 
+                          : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
+                      )}
+                    >
+                      {message.type === "text" && (
+                        <p className="text-sm leading-relaxed break-words">{message.content}</p>
+                      )}
+                      {message.type === "image" && message.content && (
+                        <div className="space-y-2">
+                          <img
+                            src={message.content}
+                            alt="Shared image"
+                            className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                            style={{ maxWidth: 240, maxHeight: 320 }}
+                            onClick={() => setPreviewImage(message.content)}
+                          />
+                        </div>
+                      )}
+                      {message.type === "file" && message.content && (
+                        <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
+                          <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <a 
+                              href={message.content} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-sm font-medium underline hover:no-underline block truncate"
+                            >
+                              {message.fileName || 'Download file'}
+                            </a>
+                            <p className="text-xs opacity-70 mt-1">{message.fileSize}</p>
+                          </div>
+                        </div>
+                      )}
+                      <p className={cn(
+                        "text-xs mt-2 opacity-70",
+                        message.senderId === "me" ? "text-right" : "text-left"
+                      )}>
+                        {message.timestamp}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} className="h-4" /> {/* Add height to ensure proper scrolling */}
+            </div>
           </ScrollArea>
-        </div>
 
-        {/* Scroll to Bottom Button */}
-        {showScrollToBottom && (
-          <Button
-            onClick={() => {
-              scrollToBottom();
-              setNewMessageCount(0);
-            }}
-            className="absolute right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
-            style={{ bottom: isKeyboardVisible ? '90px' : '20px', transition: 'bottom 0.2s' }}
-            size="sm"
-          >
-            <ChevronDown className="h-5 w-5" />
-            {newMessageCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500">
-                {newMessageCount > 9 ? '9+' : newMessageCount}
-              </Badge>
-            )}
-          </Button>
-        )}
-      </div>
+          {/* Scroll to Bottom Button */}
+          {showScrollToBottom && (
+            <Button
+              onClick={() => {
+                scrollToBottom();
+                setNewMessageCount(0);
+              }}
+              className="absolute bottom-20 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
+              size="sm"
+            >
+              <ChevronDown className="h-5 w-5" />
+              {newMessageCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500">
+                  {newMessageCount > 9 ? '9+' : newMessageCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+        </div>
 
         {/* Message Input - Sticky Footer - Always visible */}
         <div
           className={cn(
-            "sticky bottom-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95",
-            isSidebarOpen ? "z-0" : "z-50"
+            "sticky bottom-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95 z-50 mobile-safe-area",
+            isSidebarOpen ? "z-50" : "z-50", // Always high z-index for mobile
+            isKeyboardVisible && "mobile-input-focus" // Add mobile-specific class when keyboard is visible
           )}
           style={{
-            bottom: 0,
-            paddingBottom: isKeyboardVisible ? 'env(safe-area-inset-bottom, 8px)' : '16px',
-            transition: 'padding-bottom 0.2s',
+            // Ensure the input sits directly on top of the keyboard
+            bottom: isKeyboardVisible ? '0' : '0',
+            // Add safe area padding for mobile devices
+            paddingBottom: isKeyboardVisible 
+              ? '8px' 
+              : `calc(16px + env(safe-area-inset-bottom, 0px))`,
           }}
         >
           {/* Subtle top border indicator */}
@@ -1643,7 +1681,14 @@ export default function ChatPage() {
                 className="pr-20 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 style={{
                   fontSize: "16px", // Prevents zoom on iOS
+                  minHeight: "44px", // Better touch target for mobile
+                  lineHeight: "1.5",
                 }}
+                // Mobile-specific attributes
+                inputMode="text"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="sentences"
               />
             </div>
             <div 
