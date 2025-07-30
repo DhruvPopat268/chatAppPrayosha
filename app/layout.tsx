@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'Real-time chat application with voice and video calls',
   generator: 'v0.dev',
   icons: {
-    icon: '/placeholder-logo.svg',
+    icon: '/app_logo.png',
   },
 }
 
