@@ -1136,6 +1136,16 @@ export default function ChatPage() {
             right: 0;
             z-index: 9999;
           }
+          .mobile-header-visible {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 9999 !important;
+            background: white !important;
+            border-bottom: 1px solid #e5e7eb !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important;
+          }
         }
       `}</style>
       {/* Mobile Overlay */}
@@ -1419,13 +1429,24 @@ export default function ChatPage() {
           // Mobile-specific height handling
           minHeight: "100vh",
           maxHeight: "100vh",
+          // Add top padding when header is fixed (keyboard visible)
+          paddingTop: isKeyboardVisible ? "80px" : "0px", // Adjust based on header height
         }}
       >
         {/* Sticky Header - Always visible with conditional z-index */}
         <div className={cn(
           "sticky top-0 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95 z-50",
-          isSidebarOpen ? "z-50" : "z-50" // Always high z-index for mobile
-        )}>
+          isSidebarOpen ? "z-50" : "z-50", // Always high z-index for mobile
+          isKeyboardVisible && "mobile-header-visible" // Add mobile-specific class when keyboard is visible
+        )}
+        style={{
+          // Ensure header stays visible even when keyboard is open
+          position: isKeyboardVisible ? 'fixed' : 'sticky',
+          top: isKeyboardVisible ? '0' : '0',
+          left: '0',
+          right: '0',
+          zIndex: 9999, // Ensure it's always on top
+        }}>
           {/* Contact header - Always visible */}
           {selectedContact ? (
             <div className="p-4 flex items-center justify-between flex-shrink-0 border-t border-gray-100">
@@ -1519,7 +1540,10 @@ export default function ChatPage() {
         <div className="flex-1 overflow-hidden relative">
           <ScrollArea 
             ref={scrollAreaRef}
-            className="h-full p-4 pb-24" // Increased bottom padding for mobile
+            className={cn(
+              "h-full p-4 pb-24", // Increased bottom padding for mobile
+              isKeyboardVisible && "pt-20" // Add top padding when header is fixed
+            )}
             onScroll={handleScroll}
           >
             <div className="space-y-4 pb-4">
