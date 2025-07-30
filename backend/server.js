@@ -18,8 +18,7 @@ const app = express();
 const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://chat-app-bice-kappa-21.vercel.app",
-  "https://prayoshachatap.vercel.app/"
+  "https://chat-app-prayosha.vercel.app/"
 ];
 
 app.use(cors({
