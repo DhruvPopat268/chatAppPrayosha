@@ -1,16 +1,12 @@
 "use client"
-
-import type React from "react"
-
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Phone,
+      <div
+        ref={chatContainerRef}
+        className={cn(
+          'flex-1 flex flex-col bg-white min-h-0',
+          isSidebarOpen ? 'z-0' : 'z-10'
+        )}
+        style={{ minHeight: 0, height: '100dvh', maxHeight: '100dvh' }}
+      >
   Video,
   Paperclip,
   Send,
@@ -1470,18 +1466,22 @@ export default function ChatPage() {
         </div>
 
       {/* Messages - Scrollable area with no extra blank space, responsive to keyboard */}
-      <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
-        <ScrollArea
-          ref={scrollAreaRef}
-          className="h-full p-4"
-          style={{
-            paddingBottom: isKeyboardVisible ? '80px' : '20px',
-            transition: 'padding-bottom 0.2s',
-            minHeight: 0,
-            maxHeight: '100%',
-          }}
-          onScroll={handleScroll}
-        >
+      <div className="flex-1 flex flex-col overflow-hidden relative min-h-0">
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <ScrollArea
+            ref={scrollAreaRef}
+            className="flex-1 p-4 min-h-0"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              maxHeight: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              paddingBottom: isKeyboardVisible ? '80px' : '20px',
+              transition: 'padding-bottom 0.2s',
+            }}
+            onScroll={handleScroll}
+          >
           <div className="space-y-4 pb-2">
             {isLoadingMessages ? (
               <div className="flex items-center justify-center py-8">
@@ -1554,7 +1554,8 @@ export default function ChatPage() {
             )}
             <div ref={messagesEndRef} className="h-2" />
           </div>
-        </ScrollArea>
+          </ScrollArea>
+        </div>
 
         {/* Scroll to Bottom Button */}
         {showScrollToBottom && (
