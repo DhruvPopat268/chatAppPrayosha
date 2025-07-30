@@ -1,0 +1,17 @@
+# Backend files (should be deployed separately)
+backend/
+node_modules/
+.env
+.env.local
+.env.production
+
+# Development files
+.git/
+.gitignore
+README.md
+*.log
+
+# Build artifacts
+.next/
+out/
+dist/ 

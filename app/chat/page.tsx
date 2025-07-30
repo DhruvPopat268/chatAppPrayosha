@@ -1,0 +1,2017 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Phone,
+  Video,
+  Paperclip,
+  Send,
+  Search,
+  MoreVertical,
+  Smile,
+  Mic,
+  ImageIcon,
+  File,
+  PhoneOff,
+  VideoOff,
+  MicOff,
+  Trash2,
+  UserPlus,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Camera,
+  Edit,
+  Save,
+  X,
+  Loader2,
+  Bell,
+  ChevronDown,
+  MessageSquare,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { getCurrentUser, authenticatedFetch, logout } from "@/lib/clientAuth"
+import socketManager from "@/lib/socket"
+import config from "@/lib/config"
+import WebRTCManager from "@/lib/webrtc"
+import type { CallState } from "@/lib/webrtc"
+import { useRouter } from 'next/navigation';
+
+// Dynamic import for OneSignal to prevent SSR issues
+let OneSignal: any = null;
+if (typeof window !== 'undefined') {
+  import('react-onesignal').then((module) => {
+    OneSignal = module.default;
+  });
+}
+
+interface Contact {
+  id: string
+  name: string
+  avatar: string
+  lastMessage: string
+  timestamp: string
+  online: boolean
+  unread: number
+}
+
+interface Message {
+  id: string
+  senderId: string
+  content: string
+  timestamp: string
+  type: "text" | "image" | "file" | "voice"
+  fileName?: string
+  fileSize?: string
+}
+
+interface ApiUser {
+  _id: string
+  username: string
+  email: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface CurrentUser {
+  id: string
+  username: string
+  avatar: string
+  email: string
+  bio: string
+}
+
+const contacts: Contact[] = [
+  {
+    id: "1",
+    name: "Alice Johnson",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "Hey, how are you doing?",
+    timestamp: "2 min ago",
+    online: true,
+    unread: 2,
+  },
+  {
+    id: "2",
+    name: "Bob Smith",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "Thanks for the files!",
+    timestamp: "1 hour ago",
+    online: false,
+    unread: 0,
+  },
+  {
+    id: "3",
+    name: "Carol Davis",
+    avatar: "/placeholder.svg?height=40&width=40",
+    lastMessage: "See you tomorrow",
+    timestamp: "3 hours ago",
+    online: true,
+    unread: 1,
+  },
+]
+
+const initialMessages: Message[] = [
+
+
+]
+
+export default function ChatPage() {
+  const router = useRouter();
+
+  // All state declarations first
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [messages, setMessages] = useState<Message[]>(initialMessages)
+  const [newMessage, setNewMessage] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isAddFriendOpen, setIsAddFriendOpen] = useState(false)
+  const [friendSearchQuery, setFriendSearchQuery] = useState("")
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [editedUser, setEditedUser] = useState<CurrentUser | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const sendButtonRef = useRef<HTMLButtonElement>(null);
+  const isSendButtonClickedRef = useRef(false);
+  const [searchedUsers, setSearchedUsers] = useState<ApiUser[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [userContacts, setUserContacts] = useState<Contact[]>([])
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [webrtcManager, setWebrtcManager] = useState<any>(null)
+  const [callState, setCallState] = useState<CallState>({
+    isIncoming: false,
+    isOutgoing: false,
+    isConnected: false,
+    isMuted: false,
+    isSpeakerOn: false,
+    isVideoEnabled: true,
+    localStream: null,
+    remoteStream: null,
+    callData: null
+  })
+  const [incomingCallData, setIncomingCallData] = useState<any>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [contactStatus, setContactStatus] = useState<{ online: boolean, lastSeen?: number }>({ online: false });
+  const [notifEnabled, setNotifEnabled] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [newMessageCount, setNewMessageCount] = useState(0);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  // All refs
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const localAudioRef = useRef<HTMLAudioElement>(null)
+  const remoteAudioRef = useRef<HTMLAudioElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Authentication check useEffect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const user = getCurrentUser();
+      if (!user && window.location.pathname !== '/login') {
+        router.push('/login');
+      }
+    }
+  }, [router]);
+
+  // Helper to get Subscription ID from IndexedDB
+  function getSubscriptionIdFromIndexedDB() {
+    return new Promise<string>((resolve, reject) => {
+      const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
+
+      request.onerror = () => reject('❌ Failed to open IndexedDB');
+
+      request.onsuccess = () => {
+        const db = request.result;
+        const transaction = db.transaction(['subscriptions'], 'readonly');
+        const store = transaction.objectStore('subscriptions');
+        const getAllRequest = store.getAll();
+
+        getAllRequest.onsuccess = () => {
+          const subs = getAllRequest.result;
+          if (subs && subs.length > 0 && subs[0].id) {
+            resolve(subs[0].id); // ✅ Subscription ID (aka Player ID)
+          } else {
+            reject('❌ No subscription ID found in IndexedDB');
+          }
+        };
+
+        getAllRequest.onerror = () => reject('❌ Failed to read subscriptions');
+      };
+    });
+  }
+
+
+  const getAndSaveSubscriptionId = async () => {
+    try {
+      const subscriptionId = await getSubscriptionIdFromIndexedDB();
+      console.log('✅ Got Subscription ID from IndexedDB:', subscriptionId);
+      await saveSubscriptionId(subscriptionId);
+      setNotifEnabled(true);
+    } catch (e) {
+      console.error('❌ Failed to get or save Subscription ID:', e);
+      setNotifEnabled(false);
+    }
+  };
+
+
+  const saveSubscriptionId = async (subscriptionId: string) => {
+    if (!currentUser?.id) return;
+
+    try {
+      console.log('📦 Saving subscriptionId to backend:', subscriptionId);
+      const response = await fetch(`${config.getBackendUrl()}/api/save-onesignal-id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: subscriptionId, userId: currentUser.id }) // keep playerId if backend expects it
+      });
+
+      if (response.ok) {
+        console.log('✅ Subscription ID saved successfully to backend');
+      } else {
+        console.error('❌ Failed to save Subscription ID:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error saving Subscription ID:', error);
+    }
+  };
+
+  // Push notification setup useEffect
+  useEffect(() => {
+    if (!currentUser?.id) return;
+  
+    const initializeOneSignal = async () => {
+      try {
+        if (!OneSignal) {
+          const module = await import('react-onesignal');
+          OneSignal = module.default;
+        }
+  
+        console.log('🚀 Initializing OneSignal...');
+        await OneSignal.init({
+          appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerPath: '/OneSignalSDKWorker.js',
+          serviceWorkerParam: { scope: '/' }
+        });
+  
+        console.log('✅ OneSignal initialized');
+  
+        await new Promise(resolve => setTimeout(resolve, 3000));
+  
+        if ('Notification' in window) {
+          const permission = Notification.permission;
+          console.log('🔔 Notification permission:', permission);
+  
+          if (permission === 'granted') {
+            await getAndSaveSubscriptionId();
+          } else if (permission === 'default') {
+            const result = await Notification.requestPermission();
+            console.log('🔔 Permission result:', result);
+            if (result === 'granted') {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              await getAndSaveSubscriptionId();
+            }
+          }
+        }
+  
+        // Optional: event listener
+        try {
+          OneSignal.Notifications.addEventListener('permissionChange', async (permission: string) => {
+            console.log('🔄 Permission changed:', permission);
+            if (permission === 'granted') {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              await getAndSaveSubscriptionId();
+            } else {
+              setNotifEnabled(false);
+            }
+          });
+        } catch (error) {
+          console.log('⚠️ Could not set permissionChange listener');
+        }
+
+        // Handle notification clicks
+        try {
+          OneSignal.Notifications.addEventListener('click', (event: any) => {
+            console.log('🔔 Notification clicked:', event);
+            
+            // Handle call notifications
+            if (event.notification.data?.type === 'call') {
+              const callData = event.notification.data;
+              console.log('📞 Call notification clicked:', callData);
+              
+              // Navigate to chat page
+              window.location.href = '/chat';
+              
+              // Optionally, you could store the call data and show a call back option
+              // For now, just redirect to chat
+            }
+          });
+        } catch (error) {
+          console.log('⚠️ Could not set notification click listener');
+        }
+  
+      } catch (error) {
+        console.error('❌ OneSignal init error:', error);
+      }
+    };
+  
+    initializeOneSignal();
+  }, [currentUser?.id]);
+  
+  // App initialization useEffect
+  useEffect(() => {
+    const initializeApp = async () => {
+      const user = getCurrentUser()
+      if (!user) {
+        window.location.href = '/login'
+        return
+      }
+
+      const currentUserData: CurrentUser = {
+        id: user.id,
+        username: user.username || "Unknown User",
+        email: user.email || "",
+        avatar: user.avatar || "/placeholder.svg?height=40&width=40",
+        bio: "Hey there! I'm using this chat app.",
+      }
+
+      setCurrentUser(currentUserData)
+      setEditedUser(currentUserData)
+
+      // Connect to Socket.IO
+      const socket = socketManager.connect()
+
+      // Initialize WebRTC manager
+      if (socket) {
+        const webrtc = new WebRTCManager(socket)
+        setWebrtcManager(webrtc)
+
+        // Listen for call state changes
+        webrtc.onStateChange((state) => {
+          setCallState(state)
+        })
+      }
+
+      // Load contacts
+      try {
+        const response = await authenticatedFetch(`${config.getBackendUrl()}/api/contacts`)
+        if (response.ok) {
+          const contacts = await response.json()
+          setUserContacts(contacts)
+          if (contacts.length > 0 && !selectedContact) {
+            const firstContact = contacts[0]
+            setSelectedContact(firstContact)
+            // Load messages for the first contact
+            loadMessages(firstContact.id)
+          }
+        } else {
+          console.error('Failed to load contacts')
+        }
+      } catch (error) {
+        console.error('Error loading contacts:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    initializeApp()
+
+    // Cleanup on unmount
+    return () => {
+      if (webrtcManager) {
+        webrtcManager.endCall()
+      }
+      socketManager.disconnect()
+    }
+  }, [])
+
+  // Local audio stream useEffect
+  useEffect(() => {
+    if (localAudioRef.current && callState.localStream) {
+      localAudioRef.current.srcObject = callState.localStream
+      localAudioRef.current.muted = true
+      localAudioRef.current.volume = 0
+
+      // Delay play to avoid AbortError
+      setTimeout(() => {
+        if (localAudioRef.current) {
+          localAudioRef.current.play().catch(e => console.log('Local audio play failed:', e))
+        }
+      }, 500)
+    }
+  }, [callState.localStream])
+
+  // Remote audio stream useEffect
+  useEffect(() => {
+    if (remoteAudioRef.current && callState.remoteStream) {
+      remoteAudioRef.current.srcObject = callState.remoteStream
+      remoteAudioRef.current.muted = false
+      remoteAudioRef.current.volume = 1
+
+      // Delay play to avoid AbortError
+      setTimeout(() => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.play().catch(e => console.log('Remote audio play failed:', e))
+        }
+      }, 500)
+    }
+  }, [callState.remoteStream])
+
+  // Typing indicator useEffect
+  useEffect(() => {
+    if (!selectedContact || !currentUser) return;
+    let typingTimeout: NodeJS.Timeout;
+    const handleTyping = () => {
+      socketManager.sendTypingStart(selectedContact.id);
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        socketManager.sendTypingStop(selectedContact.id);
+      }, 1500);
+    };
+    if (messageInputRef.current) {
+      messageInputRef.current.addEventListener('input', handleTyping);
+    }
+    return () => {
+      if (messageInputRef.current) {
+        messageInputRef.current.removeEventListener('input', handleTyping);
+      }
+      clearTimeout(typingTimeout);
+    };
+  }, [selectedContact, currentUser]);
+
+  // Request status useEffect
+  useEffect(() => {
+    if (selectedContact && socketManager.getSocket()) {
+      socketManager.getSocket()?.emit('request_status', { userId: selectedContact.id });
+    }
+  }, [selectedContact]);
+
+  // Socket event listeners useEffect
+  useEffect(() => {
+    if (!currentUser) return;
+    socketManager.onUserTyping((data) => {
+      if (selectedContact && data.userId === selectedContact.id) {
+        setIsTyping(true);
+      }
+    });
+    socketManager.onUserStoppedTyping((data) => {
+      if (selectedContact && data.userId === selectedContact.id) {
+        setIsTyping(false);
+      }
+    });
+    // Listen for online/offline status
+    if (socketManager.getSocket()) {
+      socketManager.getSocket()?.on('user_status', (data) => {
+        if (selectedContact && data.userId === selectedContact.id) {
+          setContactStatus({ online: data.online, lastSeen: data.lastSeen });
+        }
+      });
+    }
+    return () => {
+      socketManager.removeAllListeners();
+      if (socketManager.getSocket()) {
+        socketManager.getSocket()?.off('user_status');
+      }
+    };
+  }, [selectedContact, currentUser]);
+
+  // Message handling useEffect
+  useEffect(() => {
+    if (!currentUser) return;
+    // Listen for new messages
+    socketManager.onNewMessage((message) => {
+      console.log('New message received:', message)
+
+      // Add message to the current conversation if it matches
+      if (selectedContact &&
+        (message.senderId._id === selectedContact.id || message.receiverId._id === selectedContact.id)) {
+        const newMessage: Message = {
+          id: message._id,
+          senderId: message.senderId._id === currentUser.id ? "me" : message.senderId._id,
+          content: message.content,
+          timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          type: message.type,
+          fileName: message.fileName,
+          fileSize: message.fileSize,
+        }
+        setMessages(prev => [...prev, newMessage])
+      }
+
+      // Update contact's last message
+      setUserContacts(prev => prev.map(contact => {
+        if (contact.id === message.senderId._id) {
+          return {
+            ...contact,
+            lastMessage: message.content,
+            timestamp: "Just now",
+            unread: contact.unread + 1
+          }
+        }
+        return contact
+      }))
+    })
+
+    // Listen for message sent confirmation
+    socketManager.onMessageSent((message) => {
+      console.log('Message sent successfully:', message)
+    })
+
+    // Listen for message errors
+    socketManager.onMessageError((error) => {
+      console.error('Message error:', error)
+    })
+    return () => {
+      socketManager.removeAllListeners();
+    };
+  }, [currentUser, selectedContact]);
+
+  // Load messages useEffect
+  useEffect(() => {
+    if (selectedContact && currentUser) {
+      loadMessages(selectedContact.id)
+    }
+  }, [selectedContact?.id, currentUser?.id])
+
+  // Friend search useEffect
+  useEffect(() => {
+    if (!friendSearchQuery.trim()) {
+      setSearchedUsers([]);
+      return;
+    }
+    setIsSearching(true);
+    const url = `${config.getBackendUrl()}/api/auth/search?q=${encodeURIComponent(friendSearchQuery)}`;
+    console.log('Searching users with URL:', url);
+    fetch(url)
+      .then(res => {
+        if (!res.ok) {
+          console.error('User search API error:', res.status, res.statusText);
+          return [];
+        }
+        return res.json();
+      })
+      .then(users => {
+        setSearchedUsers(
+          users.filter((u: any) =>
+            u._id !== currentUser?.id &&
+            !userContacts.some(c => c.id === u._id)
+          )
+        );
+      })
+      .catch((err) => {
+        console.error('User search fetch error:', err);
+        setSearchedUsers([])
+      })
+      .finally(() => setIsSearching(false));
+  }, [friendSearchQuery, currentUser, userContacts]);
+
+  // Check notification status
+  useEffect(() => {
+    const checkNotificationStatus = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        // Ensure OneSignal is loaded
+        if (!OneSignal) {
+          const module = await import('react-onesignal');
+          OneSignal = module.default;
+        }
+
+        const isSubscribed = await OneSignal.Notifications.isPushSupported();
+        setNotifEnabled(isSubscribed);
+        console.log('Notification status checked:', isSubscribed);
+      } catch (error) {
+        console.error('Error checking notification status:', error);
+      }
+    };
+
+    // Check status after a delay to ensure OneSignal is initialized
+    const timer = setTimeout(checkNotificationStatus, 2000);
+    return () => clearTimeout(timer);
+  }, [currentUser?.id]);
+
+  // All other functions and logic below
+  const handleTyping = () => {
+    if (!selectedContact || !currentUser) return;
+    socketManager.sendTypingStart(selectedContact.id);
+    setTimeout(() => {
+      socketManager.sendTypingStop(selectedContact.id);
+    }, 1500);
+  };
+
+  const enableNotifications = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      // Ensure OneSignal is loaded
+      if (!OneSignal) {
+        const module = await import('react-onesignal');
+        OneSignal = module.default;
+      }
+
+      console.log('Requesting notification permission...');
+
+      // Request permission using browser API
+      const result = await Notification.requestPermission();
+      console.log('Permission result:', result);
+
+      if (result === 'granted') {
+        // Try to trigger OneSignal subscription
+        try {
+          console.log('Triggering OneSignal subscription...');
+          await OneSignal.showSlidedownPrompt();
+
+          // Wait for OneSignal to register
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          await getAndSaveSubscriptionId();
+          await getAndSaveSubscriptionId();
+        } catch (error) {
+          console.log('OneSignal subscription failed, trying direct approach...');
+          // Wait for OneSignal to register
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          await getAndSaveSubscriptionId();
+        }
+      }
+    } catch (error) {
+      console.error('Error enabling notifications:', error);
+    }
+  };
+
+  // Handle input focus for mobile
+  const handleInputFocus = () => {
+    setIsKeyboardVisible(true);
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100) // Reduced delay for faster response
+  }
+
+  const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    // If send button was just clicked, don't close keyboard
+    if (isSendButtonClickedRef.current) {
+      return;
+    }
+    
+    // Check if the related target (what we're clicking on) is the send button
+    const relatedTarget = event.relatedTarget as HTMLElement;
+    
+    if (relatedTarget && sendButtonRef.current && sendButtonRef.current.contains(relatedTarget)) {
+      // Don't close keyboard if clicking on send button
+      return;
+    }
+    
+    // For other blur events, let the viewport change handler determine keyboard state
+    // This prevents keyboard from closing when clicking outside the input
+  }
+
+  // Handle viewport changes for mobile keyboard
+  useEffect(() => {
+    const handleViewportChange = () => {
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        const viewport = window.visualViewport;
+        const isKeyboardOpen = viewport.height < window.innerHeight * 0.85; // More sensitive detection
+        setIsKeyboardVisible(isKeyboardOpen);
+        
+        // Force re-render to update footer position
+        setTimeout(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.style.height = isKeyboardOpen 
+              ? `${viewport.height}px` 
+              : '100vh';
+          }
+        }, 100);
+        
+        // If keyboard is open, scroll to bottom immediately
+        if (isKeyboardOpen) {
+          setTimeout(() => {
+            scrollToBottom();
+          }, 150);
+        }
+      }
+    };
+
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      return () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', handleViewportChange);
+        }
+      };
+    }
+  }, []);
+
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedContact || !currentUser) return;
+
+    // Set flag to prevent blur
+    isSendButtonClickedRef.current = true;
+
+    // Immediately refocus the input to prevent blur
+    if (messageInputRef.current) {
+      messageInputRef.current.focus();
+    }
+
+    // Send message via Socket.IO
+    socketManager.sendMessage(selectedContact.id, newMessage, "text");
+
+    // Add message to local state immediately for optimistic UI
+    const message: Message = {
+      id: Date.now().toString(),
+      senderId: "me",
+      content: newMessage,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      type: "text",
+    };
+
+    setMessages(prev => [...prev, message]);
+    setNewMessage("");
+
+    // Update contact's last message
+    setUserContacts(prev => prev.map(contact => {
+      if (contact.id === selectedContact.id) {
+        return {
+          ...contact,
+          lastMessage: newMessage,
+          timestamp: "Just now",
+          unread: 0
+        };
+      }
+      return contact;
+    }));
+
+    // Scroll to bottom immediately after sending
+    setTimeout(() => {
+      scrollToBottom();
+    }, 50);
+
+    // Reset flag and ensure input stays focused
+    setTimeout(() => {
+      isSendButtonClickedRef.current = false;
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+      }
+    }, 100);
+  };
+
+  const handleFileUpload = (type: "image" | "file") => {
+    const message: Message = {
+      id: Date.now().toString(),
+      senderId: "me",
+      content: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      type: type,
+      fileName: type === "file" ? "document.pdf" : undefined,
+      fileSize: type === "file" ? "2.4 MB" : undefined,
+    }
+
+    setMessages([...messages, message])
+  }
+
+  const handleAvatarUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  // const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = event.target.files?.[0]
+  //   if (file && editedUser) {
+  //     // In a real app, you would upload the file to a server
+  //     // For now, we'll just create a local URL
+  //     const imageUrl = URL.createObjectURL(file)
+  //     setEditedUser({ ...editedUser, avatar: imageUrl })
+  //   }
+  // }
+
+  const saveProfile = () => {
+    setCurrentUser(editedUser)
+    setIsEditingProfile(false)
+  }
+
+  const cancelEdit = () => {
+    setEditedUser(currentUser)
+    setIsEditingProfile(false)
+  }
+
+  const addFriend = async (user: ApiUser) => {
+    try {
+      const response = await authenticatedFetch(`${config.getBackendUrl()}/api/contacts`, {
+        method: 'POST',
+        body: JSON.stringify({ contactId: user._id }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const newContact: Contact = {
+          id: user._id,
+          name: user.username,
+          avatar: "/placeholder.svg?height=40&width=40",
+          lastMessage: "",
+          timestamp: "Just now",
+          online: false,
+          unread: 0,
+        }
+
+        setUserContacts(prev => [...prev, newContact])
+        setSearchedUsers(prev => prev.filter(u => u._id !== user._id))
+        setFriendSearchQuery("")
+
+        // Show success feedback
+        console.log(`Added ${user.username} to contacts`)
+      } else {
+        const error = await response.json()
+        console.error('Failed to add contact:', error.error)
+      }
+    } catch (error) {
+      console.error('Error adding contact:', error)
+    }
+  }
+
+  // Load messages for a contact
+  const loadMessages = async (contactId: string) => {
+    setIsLoadingMessages(true)
+    try {
+      const response = await authenticatedFetch(`${config.getBackendUrl()}/api/messages/${contactId}`)
+      if (response.ok) {
+        const messagesData = await response.json()
+        const formattedMessages: Message[] = messagesData.map((msg: any) => ({
+          id: msg._id,
+          senderId: msg.senderId._id === currentUser?.id ? "me" : msg.senderId._id,
+          content: msg.content,
+          timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          type: msg.type,
+          fileName: msg.fileName,
+          fileSize: msg.fileSize,
+        }))
+        setMessages(formattedMessages)
+      } else {
+        console.error('Failed to load messages')
+        setMessages([])
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error)
+      setMessages([])
+    } finally {
+      setIsLoadingMessages(false)
+    }
+  }
+
+  const deleteHistory = async () => {
+    if (!selectedContact || !currentUser) return;
+    try {
+      // Call backend API to delete all messages between current user and selected contact
+      const token = localStorage.getItem('token');
+      await fetch(`${config.getBackendUrl()}/api/messages/${selectedContact.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+    } catch (err) {
+      console.error('Failed to delete messages from database', err);
+    }
+    setMessages([]);
+    setShowDeleteConfirm(false);
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    window.location.href = '/login'
+  }
+
+  const filteredContacts = userContacts.filter((contact) => contact.name.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ 
+          behavior, 
+          block: 'end',
+          inline: 'nearest'
+        });
+      }
+    }, 100); // Small delay to ensure DOM is updated
+  };
+
+  // Handle scroll events to show/hide scroll to bottom button
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLDivElement;
+    const { scrollTop, scrollHeight, clientHeight } = target;
+    
+    // Check if user is at the bottom
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 10;
+    setIsAtBottom(isAtBottom);
+    
+    // Show scroll to bottom button if not at bottom
+    setShowScrollToBottom(!isAtBottom);
+    
+    // Reset new message count if user scrolls to bottom
+    if (isAtBottom) {
+      setNewMessageCount(0);
+    }
+  };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      if (isAtBottom) {
+        scrollToBottom();
+      } else {
+        // Increment new message count if user is not at bottom
+        setNewMessageCount(prev => prev + 1);
+      }
+    }
+  }, [messages, isAtBottom]);
+
+  // Scroll to bottom when contact changes
+  useEffect(() => {
+    if (selectedContact) {
+      setTimeout(() => {
+        scrollToBottom('auto');
+      }, 300);
+    }
+  }, [selectedContact?.id]);
+
+  // Early return for loading state must come after all hooks
+  if (isLoading || !currentUser) {
+    return (
+      <div className="flex h-screen bg-gray-50 items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Add Cloudinary upload function
+  const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'prayoshaChatApp');
+    formData.append('cloud_name', process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'deqab5u6x');
+    // Use /image/upload for images, /raw/upload for everything else
+    const isImage = file.type.startsWith('image/');
+    const endpoint = isImage ? 'image' : 'raw';
+    try {
+      setIsUploadingImage(true);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'deqab5u6x'}/${endpoint}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      setIsUploadingImage(false);
+      return data.secure_url || null;
+    } catch (err) {
+      setIsUploadingImage(false);
+      alert('File upload failed');
+      return null;
+    }
+  };
+
+  const handleImageButtonClick = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadImageToCloudinary(file);
+    if (url && selectedContact && currentUser) {
+      // Send image message
+      socketManager.sendMessage(selectedContact.id, url, "image");
+      const message: Message = {
+        id: Date.now().toString(),
+        senderId: "me",
+        content: url,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        type: "image",
+      };
+      setMessages(prev => [...prev, message]);
+      setNewMessage("");
+    }
+  };
+
+  // Add file upload handler
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadImageToCloudinary(file); // Cloudinary supports files too
+    if (url && selectedContact && currentUser) {
+      socketManager.sendMessage(selectedContact.id, url, "file", file.name, (file.size / 1024 / 1024).toFixed(2) + ' MB');
+      const message: Message = {
+        id: Date.now().toString(),
+        senderId: "me",
+        content: url,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        type: "file",
+        fileName: file.name,
+        fileSize: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+      };
+      setMessages(prev => [...prev, message]);
+      setNewMessage("");
+    }
+  };
+
+  // Remove the old handleFileChange for avatar upload
+  // Add a new function for avatar upload
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file && editedUser) {
+      // In a real app, you would upload the file to a server
+      // For now, we'll just create a local URL
+      const imageUrl = URL.createObjectURL(file)
+      setEditedUser({ ...editedUser, avatar: imageUrl })
+    }
+  }
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => !prev);
+  };
+
+  const forceOneSignalSubscription = async () => {
+    if (!currentUser?.id) return;
+    try {
+      // Ensure OneSignal is loaded
+      if (!OneSignal) {
+        const module = await import('react-onesignal');
+        OneSignal = module.default;
+      }
+      console.log('Forcing OneSignal subscription...');
+      await OneSignal.showSlidedownPrompt();
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      await getAndSaveSubscriptionId();
+      console.log('OneSignal subscription forced successfully.');
+    } catch (error) {
+      console.error('Error forcing OneSignal subscription:', error);
+    }
+  };
+
+  const testPlayerIdRetrieval = async () => {
+    if (!currentUser?.id) return;
+    try {
+      console.log('Testing playerId retrieval...');
+      // Wait a bit to ensure OneSignal is fully initialized
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await getAndSaveSubscriptionId();
+      console.log('PlayerId retrieval test completed.');
+    } catch (error) {
+      console.error('Error testing playerId retrieval:', error);
+    }
+  };
+
+  const manuallySetPlayerId = async () => {
+    if (!currentUser?.id) return;
+    try {
+      console.log('Manually setting playerId...');
+      // Based on your OneSignal dashboard, the ID is: b8139c77-7c08-4cc5-9afc-2a0310041d2b
+      const playerId = 'b8139c77-7c08-4cc5-9afc-2a0310041d2b';
+      await saveSubscriptionId(playerId);
+      setNotifEnabled(true);
+      console.log('PlayerId manually set successfully:', playerId);
+    } catch (error) {
+      console.error('Error manually setting playerId:', error);
+    }
+  };
+
+
+  return (
+    <div className="flex h-screen bg-gray-50 relative overflow-hidden">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-5 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={cn(
+          "bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out relative",
+          isSidebarOpen 
+            ? "w-80 fixed md:relative inset-y-0 left-0 md:left-auto z-10" 
+            : "w-0 md:w-12 overflow-hidden z-20 md:z-auto"
+        )}
+      >
+        {/* Sidebar Toggle Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className={cn(
+            "absolute top-4 z-30 transition-all duration-300 rounded-full h-8 w-8 p-0",
+            isSidebarOpen
+              ? "right-4 hover:bg-gray-100"
+              : "right-2 md:right-1 bg-blue-500 text-white hover:bg-blue-600 shadow-lg",
+          )}
+        >
+          {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </Button>
+
+        {/* Sidebar Content */}
+        <div
+          className={cn(
+            "transition-all duration-300 h-full",
+            isSidebarOpen ? "opacity-100 z-10" : "opacity-0 md:opacity-100",
+          )}
+        >
+          {isSidebarOpen ? (
+            <>
+              {/* Header */}
+              <div className="p-4 border-b border-gray-200 pt-16">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={currentUser.avatar || "/placeholder.svg"} />
+                      <AvatarFallback>
+                        {currentUser.username
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <h1 className="text-xl font-semibold">Messages</h1>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Dialog open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                        >
+                          <UserPlus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Add Friends</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                            <Input
+                              placeholder="Search people..."
+                              value={friendSearchQuery}
+                              onChange={(e) => setFriendSearchQuery(e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+
+                          {/* Searched Users */}
+                          {friendSearchQuery.trim() && (
+                            <div>
+                              <h3 className="text-sm font-medium text-gray-700 mb-2">Search Results</h3>
+                              {isSearching ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  <span className="text-sm text-gray-500">Searching...</span>
+                                </div>
+                              ) : searchedUsers.length > 0 ? (
+                                <div className="space-y-2">
+                                  {searchedUsers.map((user) => (
+                                    <div key={user._id} className="flex items-center justify-between p-2 rounded-lg border">
+                                      <div className="flex items-center space-x-3">
+                                        <Avatar className="h-8 w-8">
+                                          <AvatarImage src="/placeholder.svg" />
+                                          <AvatarFallback>
+                                            {user.username
+                                              .split(" ")
+                                              .map((n) => n[0])
+                                              .join("")}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                          <p className="text-sm font-medium">{user.username}</p>
+                                          <p className="text-xs text-gray-500">{user.email}</p>
+                                        </div>
+                                      </div>
+                                      <Button size="sm" variant="outline" onClick={() => addFriend(user)}>
+                                        <UserPlus className="h-3 w-3 mr-1" />
+                                        Add
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-4">
+                                  <p className="text-sm text-gray-500">No users found</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                          <User className="h-4 w-4 mr-2" />
+                          My Account
+                        </DropdownMenuItem>
+                        {/* <DropdownMenuItem onClick={enableNotifications}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={getAndSaveSubscriptionId}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Test Get PlayerId
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={forceOneSignalSubscription}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Force OneSignal Subscription
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testPlayerIdRetrieval}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Test PlayerId Retrieval
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={manuallySetPlayerId}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Manually Set PlayerId
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator /> */}
+                        <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Logout             </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search conversations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Contacts List */}
+              <ScrollArea className="flex-1">
+                <div className="p-2">
+                  {filteredContacts.map((contact) => (
+                    <div
+                      key={contact.id}
+                      onClick={() => {
+                        setSelectedContact(contact)
+                      }}
+                      className={cn(
+                        "flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors",
+                        selectedContact?.id === contact.id && "bg-blue-50 border border-blue-200",
+                      )}
+                    >
+                      <div className="relative">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={contact.avatar || "/placeholder.svg"} />
+                          <AvatarFallback>
+                            {contact.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        {contact.online && (
+                          <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-white rounded-full"></div>
+                        )}
+                      </div>
+                      <div className="ml-3 flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-900 truncate">{contact.name}</p>
+                          <p className="text-xs text-gray-500">{contact.timestamp}</p>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-gray-500 truncate">{contact.lastMessage}</p>
+                          {contact.unread > 0 && (
+                            <Badge
+                              variant="default"
+                              className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                            >
+                              {contact.unread}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          ) : (
+            // Collapsed sidebar - show only essential buttons
+            <div className="hidden md:flex flex-col items-center py-4 space-y-4 pt-16">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsSidebarOpen(true)
+                  setIsAddFriendOpen(true)
+                }}
+                className="p-2 rounded-full"
+                title="Add Friends"
+              >
+                <UserPlus className="h-4 w-4" />
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="p-2 rounded-full" title="Menu">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right">
+                  <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                    <User className="h-4 w-4 mr-2" />
+                    My Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div 
+        ref={chatContainerRef}
+        className={cn(
+          "flex-1 flex flex-col bg-white",
+          isSidebarOpen ? "z-0" : "z-10"
+        )}
+        style={{
+          height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
+            ? `${window.visualViewport?.height || window.innerHeight}px` 
+            : "100vh",
+          paddingBottom: '72px' // Fixed padding for footer height
+        }}
+      >
+        {/* Sticky Header - Always visible with conditional z-index */}
+        <div className={cn(
+          "sticky top-0 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95",
+          isSidebarOpen ? "z-0" : "z-40" // Lower z-index when sidebar is open
+        )}>
+          {/* Contact header - Always visible */}
+          {selectedContact ? (
+            <div className="p-4 flex items-center justify-between flex-shrink-0 border-t border-gray-100">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSidebar}
+                  className="p-2 rounded-full hover:bg-gray-100"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Avatar>
+                  <AvatarImage src={selectedContact?.avatar || "/placeholder.svg"} />
+                  <AvatarFallback>
+                    {selectedContact?.name
+                      ? selectedContact.name.split(" ").map((n) => n[0]).join("")
+                      : "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold">{selectedContact?.name || "No Contact"}</h3>
+                  <p className="text-sm text-gray-500">
+                    {isTyping
+                      ? "Typing..."
+                      : contactStatus.online
+                        ? "Online"
+                        : contactStatus.lastSeen
+                          ? `Last seen ${Math.round((Date.now() - contactStatus.lastSeen) / 60000)} min ago`
+                          : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {/* Voice Call Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-2 rounded-full hover:bg-gray-100"
+                  onClick={() => {
+                    if (webrtcManager && selectedContact) {
+                      webrtcManager.startVoiceCall(selectedContact.id)
+                    }
+                  }}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected}
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+                {/* Video Call Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-2 rounded-full hover:bg-gray-100"
+                  onClick={() => {
+                    if (webrtcManager && selectedContact) {
+                      webrtcManager.startVideoCall(selectedContact.id)
+                    }
+                  }}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected}
+                >
+                  <Video className="h-4 w-4" />
+                </Button>
+
+                {/* More Options Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete History
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 flex items-center justify-center flex-shrink-0 border-t border-gray-100">
+              <div className="text-center">
+                <h3 className="font-semibold text-gray-500">Select a contact to start chatting</h3>
+                <p className="text-sm text-gray-400 mt-1">Choose someone from your contacts list</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Messages - Scrollable area */}
+        <div className="flex-1 overflow-hidden relative">
+          <ScrollArea 
+            ref={scrollAreaRef}
+            className="h-full p-4" // Removed bottom padding to eliminate blank space
+            onScroll={handleScroll}
+          >
+            <div className="space-y-4 pb-4">
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span className="text-sm text-gray-500">Loading messages...</span>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <MessageSquare className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+                  <p className="text-sm text-gray-500 max-w-sm">
+                    Start a conversation with {selectedContact?.name || 'your contact'} by sending your first message!
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn("flex mb-4", message.senderId === "me" ? "justify-end" : "justify-start")}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
+                        message.senderId === "me" 
+                          ? "bg-blue-500 text-white rounded-br-md" 
+                          : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
+                      )}
+                    >
+                      {message.type === "text" && (
+                        <p className="text-sm leading-relaxed break-words">{message.content}</p>
+                      )}
+                      {message.type === "image" && message.content && (
+                        <div className="space-y-2">
+                          <img
+                            src={message.content}
+                            alt="Shared image"
+                            className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                            style={{ maxWidth: 240, maxHeight: 320 }}
+                            onClick={() => setPreviewImage(message.content)}
+                          />
+                        </div>
+                      )}
+                      {message.type === "file" && message.content && (
+                        <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
+                          <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <a 
+                              href={message.content} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-sm font-medium underline hover:no-underline block truncate"
+                            >
+                              {message.fileName || 'Download file'}
+                            </a>
+                            <p className="text-xs opacity-70 mt-1">{message.fileSize}</p>
+                          </div>
+                        </div>
+                      )}
+                      <p className={cn(
+                        "text-xs mt-2 opacity-70",
+                        message.senderId === "me" ? "text-right" : "text-left"
+                      )}>
+                        {message.timestamp}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} className="h-4" /> {/* Add height to ensure proper scrolling */}
+            </div>
+          </ScrollArea>
+
+          {/* Scroll to Bottom Button */}
+          {showScrollToBottom && (
+            <Button
+              onClick={() => {
+                scrollToBottom();
+                setNewMessageCount(0);
+              }}
+              className="absolute bottom-24 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
+              size="sm"
+            >
+              <ChevronDown className="h-5 w-5" />
+              {newMessageCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500">
+                  {newMessageCount > 9 ? '9+' : newMessageCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+        </div>
+
+        {/* Message Input - Fixed Footer */}
+        <div
+          className={cn(
+            "fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95 z-50",
+            isSidebarOpen ? "md:left-80" : "md:left-12" // Adjust for sidebar state
+          )}
+          style={{
+            // Ensure the input sits directly on top of the keyboard
+            bottom: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
+              ? `${window.visualViewport.height - 72}px` // Position above keyboard with exact height
+              : '0',
+            paddingBottom: isKeyboardVisible ? '8px' : '16px',
+          }}
+        >
+          {/* Subtle top border indicator */}
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 opacity-50"></div>
+          
+          <div className="flex items-center space-x-2">
+            {/* Media Upload Buttons */}
+            <div className="flex items-center space-x-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleImageButtonClick} 
+                disabled={isUploadingImage}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title="Send image"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleFileButtonClick} 
+                disabled={isUploadingImage}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title="Send file"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
+            
+            {/* Message Input Field */}
+            <div className="flex-1 relative">
+              <Input
+                ref={messageInputRef}
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
+                className="pr-20 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                style={{
+                  fontSize: "16px", // Prevents zoom on iOS
+                }}
+              />
+            </div>
+            
+            {/* Send Button */}
+            <div 
+              className="flex-shrink-0"
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+            >
+              <Button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  sendMessage();
+                }}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  sendMessage();
+                }}
+                ref={sendButtonRef}
+                size="sm" 
+                disabled={isUploadingImage || !newMessage.trim()}
+                className={cn(
+                  "p-2 rounded-full transition-all duration-200",
+                  newMessage.trim() 
+                    ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md" 
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                )}
+                title="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Modal */}
+      <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>My Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Avatar Section */}
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={isEditingProfile && editedUser ? editedUser.avatar : currentUser.avatar} />
+                  <AvatarFallback className="text-2xl">
+                    {(isEditingProfile && editedUser ? editedUser.username : currentUser.username)
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                {isEditingProfile && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-transparent"
+                    onClick={handleAvatarUpload}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {/* Use handleAvatarFileChange for avatar input */}
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
+            </div>
+
+            {/* Profile Information */}
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="username">Username</Label>
+                {isEditingProfile && editedUser ? (
+                  <Input
+                    id="username"
+                    value={editedUser.username}
+                    onChange={(e) => setEditedUser({ ...editedUser, username: e.target.value })}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-600">{currentUser.username}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="email">Email</Label>
+                {isEditingProfile && editedUser ? (
+                  <Input
+                    id="email"
+                    type="email"
+                    value={editedUser.email}
+                    onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-600">{currentUser.email}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="bio">Bio</Label>
+                {isEditingProfile && editedUser ? (
+                  <Input
+                    id="bio"
+                    value={editedUser.bio}
+                    onChange={(e) => setEditedUser({ ...editedUser, bio: e.target.value })}
+                    className="mt-1"
+                    placeholder="Tell us about yourself..."
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-gray-600">{currentUser.bio}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2">
+              {isEditingProfile ? (
+                <>
+                  <Button variant="outline" onClick={cancelEdit}>
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button onClick={saveProfile}>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setIsEditingProfile(true)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete History Confirmation */}
+      {showDeleteConfirm && selectedContact && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-96 p-6">
+            <h3 className="text-lg font-semibold mb-2">Delete Chat History</h3>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to delete all messages with {selectedContact.name}? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={deleteHistory}>
+                Delete
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Incoming Call Modal */}
+      {callState.isIncoming && callState.callData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-96 p-6">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                <Phone className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Incoming Call</h3>
+                <p className="text-gray-600">Voice Call</p>
+              </div>
+              <div className="flex justify-center space-x-4">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => webrtcManager?.rejectCall()}
+                  className="bg-red-500 text-white hover:bg-red-600"
+                >
+                  <PhoneOff className="h-5 w-5 mr-2" />
+                  Decline
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={async () => {
+                    if (webrtcManager) {
+                      console.log('User clicked accept call')
+                      const success = await webrtcManager.acceptCall()
+                      console.log('Accept call result:', success)
+                    }
+                  }}
+                  className="bg-green-500 hover:bg-green-600"
+                >
+                  <Phone className="h-5 w-5 mr-2" />
+                  Accept
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Outgoing Call Modal */}
+      {callState.isOutgoing && callState.callData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-96 p-6">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                <Phone className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Calling...</h3>
+                <p className="text-gray-600">Voice Call</p>
+              </div>
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => webrtcManager?.endCall()}
+                  className="bg-red-500 text-white hover:bg-red-600"
+                >
+                  <PhoneOff className="h-5 w-5 mr-2" />
+                  End Call
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Active Call Controls */}
+      {callState.isConnected && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg p-4 shadow-lg z-40">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => webrtcManager?.toggleMute()}
+              className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600" : "hover:bg-gray-100"}
+            >
+              {callState.isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => webrtcManager?.toggleSpeaker()}
+              className={callState.isSpeakerOn ? "bg-blue-500 text-white" : "hover:bg-gray-100"}
+            >
+              <Phone className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => webrtcManager?.endCall()}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              <PhoneOff className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Video Call Modal */}
+      {callState.isConnected && callState.callData && callState.callData.callType === 'video' && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl p-4 flex flex-col items-center relative">
+            {/* Video Controls - Large, always visible */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-6 z-10">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => webrtcManager?.toggleMute()}
+                className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
+                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => webrtcManager?.endCall()}
+                className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
+                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <PhoneOff className="h-8 w-8" />
+              </Button>
+            </div>
+            <div className="relative w-full flex flex-col items-center">
+              {/* Remote Video */}
+              <video
+                id="remoteVideo"
+                autoPlay
+                playsInline
+                style={{ width: '100%', maxHeight: '60vh', background: '#222', borderRadius: '12px' }}
+                ref={node => {
+                  if (node && callState.remoteStream) {
+                    node.srcObject = callState.remoteStream;
+                  }
+                }}
+              />
+              {/* Local Video (small overlay) */}
+              <video
+                id="localVideo"
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  position: 'absolute',
+                  bottom: '16px',
+                  right: '16px',
+                  width: '120px',
+                  height: '90px',
+                  background: '#444',
+                  borderRadius: '8px',
+                  border: '2px solid #fff',
+                  objectFit: 'cover',
+                }}
+                ref={node => {
+                  if (node && callState.localStream) {
+                    node.srcObject = callState.localStream;
+                  }
+                }}
+              />
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onClick={() => setPreviewImage(null)}>
+          <div className="relative">
+            <img src={previewImage} alt="Preview" className="max-w-full max-h-[80vh] rounded-lg" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute top-2 right-2 bg-white"
+              onClick={e => { e.stopPropagation(); setPreviewImage(null); }}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Audio Elements for Call Streams - Using refs to prevent re-render issues */}
+      <audio
+        ref={localAudioRef}
+        autoPlay
+        playsInline
+        muted
+        style={{ display: 'none' }}
+      />
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        style={{ display: 'none' }}
+      />
+
+    </div>
+  )
+}
