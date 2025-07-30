@@ -180,6 +180,8 @@ export default function ChatPage() {
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
+  const [viewportHeight, setViewportHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 0)
+
   // All refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -348,6 +350,11 @@ export default function ChatPage() {
   // App initialization useEffect
   useEffect(() => {
     const initializeApp = async () => {
+      // Set initial viewport height
+      if (typeof window !== 'undefined' && window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      }
+      
       const user = getCurrentUser()
       if (!user) {
         window.location.href = '/login'
@@ -694,8 +701,9 @@ export default function ChatPage() {
     const handleViewportChange = () => {
       if (typeof window !== 'undefined' && window.visualViewport) {
         const viewport = window.visualViewport;
-        const isKeyboardOpen = viewport.height < window.innerHeight * 0.9; // More sensitive detection
+        const isKeyboardOpen = viewport.height < window.innerHeight * 0.95; // Very sensitive detection
         setIsKeyboardVisible(isKeyboardOpen);
+        setViewportHeight(viewport.height);
         
         // Force re-render to update footer position immediately
         if (chatContainerRef.current) {
@@ -708,7 +716,7 @@ export default function ChatPage() {
         if (isKeyboardOpen) {
           setTimeout(() => {
             scrollToBottom();
-          }, 50);
+          }, 10);
         }
       }
     };
@@ -1377,10 +1385,10 @@ export default function ChatPage() {
           isSidebarOpen ? "z-0" : "z-10"
         )}
         style={{
-          height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
-            ? `${window.visualViewport?.height || window.innerHeight}px` 
+          height: isKeyboardVisible && viewportHeight > 0
+            ? `${viewportHeight}px` 
             : "100vh",
-          paddingBottom: '60px' // Fixed padding for footer height
+          paddingBottom: '56px' // Fixed padding for footer height
         }}
       >
         {/* Sticky Header - Always visible with conditional z-index */}
@@ -1565,7 +1573,7 @@ export default function ChatPage() {
                 scrollToBottom();
                 setNewMessageCount(0);
               }}
-              className="absolute bottom-20 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
+              className="absolute bottom-16 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
               size="sm"
             >
               <ChevronDown className="h-5 w-5" />
@@ -1586,11 +1594,11 @@ export default function ChatPage() {
           )}
           style={{
             // Ensure the input sits directly on top of the keyboard
-            bottom: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
-              ? `${window.visualViewport.height - 60}px` // Position exactly at keyboard top
+            bottom: isKeyboardVisible && viewportHeight > 0
+              ? `${viewportHeight - 56}px` // Position exactly at keyboard top
               : '0',
             paddingBottom: isKeyboardVisible ? '0px' : '16px',
-            transition: 'bottom 0.1s ease-out', // Smooth transition
+            transition: 'bottom 0.05s ease-out', // Faster transition
           }}
         >
           {/* Subtle top border indicator */}
