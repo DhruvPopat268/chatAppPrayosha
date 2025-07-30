@@ -1469,117 +1469,124 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Messages - Scrollable area with proper spacing for sticky footer */}
-        <div className="flex-1 overflow-hidden relative">
-          <ScrollArea 
-            ref={scrollAreaRef}
-            className="h-full p-4 pb-20" // Reduced bottom padding to prevent overlap
-            onScroll={handleScroll}
-          >
-            <div className="space-y-4 pb-4">
-              {isLoadingMessages ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  <span className="text-sm text-gray-500">Loading messages...</span>
+      {/* Messages - Scrollable area with no extra blank space, responsive to keyboard */}
+      <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
+        <ScrollArea
+          ref={scrollAreaRef}
+          className="h-full p-4"
+          style={{
+            paddingBottom: isKeyboardVisible ? '80px' : '20px',
+            transition: 'padding-bottom 0.2s',
+            minHeight: 0,
+            maxHeight: '100%',
+          }}
+          onScroll={handleScroll}
+        >
+          <div className="space-y-4 pb-2">
+            {isLoadingMessages ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                <span className="text-sm text-gray-500">Loading messages...</span>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <MessageSquare className="h-8 w-8 text-gray-400" />
                 </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <MessageSquare className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                  <p className="text-sm text-gray-500 max-w-sm">
-                    Start a conversation with {selectedContact?.name || 'your contact'} by sending your first message!
-                  </p>
-                </div>
-              ) : (
-                messages.map((message) => (
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+                <p className="text-sm text-gray-500 max-w-sm">
+                  Start a conversation with {selectedContact?.name || 'your contact'} by sending your first message!
+                </p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn("flex mb-4", message.senderId === "me" ? "justify-end" : "justify-start")}
+                >
                   <div
-                    key={message.id}
-                    className={cn("flex mb-4", message.senderId === "me" ? "justify-end" : "justify-start")}
+                    className={cn(
+                      "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
+                      message.senderId === "me" 
+                        ? "bg-blue-500 text-white rounded-br-md" 
+                        : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
+                    )}
                   >
-                    <div
-                      className={cn(
-                        "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
-                        message.senderId === "me" 
-                          ? "bg-blue-500 text-white rounded-br-md" 
-                          : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
-                      )}
-                    >
-                      {message.type === "text" && (
-                        <p className="text-sm leading-relaxed break-words">{message.content}</p>
-                      )}
-                      {message.type === "image" && message.content && (
-                        <div className="space-y-2">
-                          <img
-                            src={message.content}
-                            alt="Shared image"
-                            className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                            style={{ maxWidth: 240, maxHeight: 320 }}
-                            onClick={() => setPreviewImage(message.content)}
-                          />
+                    {message.type === "text" && (
+                      <p className="text-sm leading-relaxed break-words">{message.content}</p>
+                    )}
+                    {message.type === "image" && message.content && (
+                      <div className="space-y-2">
+                        <img
+                          src={message.content}
+                          alt="Shared image"
+                          className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                          style={{ maxWidth: 240, maxHeight: 320 }}
+                          onClick={() => setPreviewImage(message.content)}
+                        />
+                      </div>
+                    )}
+                    {message.type === "file" && message.content && (
+                      <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
+                        <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <a 
+                            href={message.content} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-sm font-medium underline hover:no-underline block truncate"
+                          >
+                            {message.fileName || 'Download file'}
+                          </a>
+                          <p className="text-xs opacity-70 mt-1">{message.fileSize}</p>
                         </div>
-                      )}
-                      {message.type === "file" && message.content && (
-                        <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
-                          <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <a 
-                              href={message.content} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="text-sm font-medium underline hover:no-underline block truncate"
-                            >
-                              {message.fileName || 'Download file'}
-                            </a>
-                            <p className="text-xs opacity-70 mt-1">{message.fileSize}</p>
-                          </div>
-                        </div>
-                      )}
-                      <p className={cn(
-                        "text-xs mt-2 opacity-70",
-                        message.senderId === "me" ? "text-right" : "text-left"
-                      )}>
-                        {message.timestamp}
-                      </p>
-                    </div>
+                      </div>
+                    )}
+                    <p className={cn(
+                      "text-xs mt-2 opacity-70",
+                      message.senderId === "me" ? "text-right" : "text-left"
+                    )}>
+                      {message.timestamp}
+                    </p>
                   </div>
-                ))
-              )}
-              <div ref={messagesEndRef} className="h-4" /> {/* Add height to ensure proper scrolling */}
-            </div>
-          </ScrollArea>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} className="h-2" />
+          </div>
+        </ScrollArea>
 
-          {/* Scroll to Bottom Button */}
-          {showScrollToBottom && (
-            <Button
-              onClick={() => {
-                scrollToBottom();
-                setNewMessageCount(0);
-              }}
-              className="absolute bottom-20 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
-              size="sm"
-            >
-              <ChevronDown className="h-5 w-5" />
-              {newMessageCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500">
-                  {newMessageCount > 9 ? '9+' : newMessageCount}
-                </Badge>
-              )}
-            </Button>
-          )}
-        </div>
+        {/* Scroll to Bottom Button */}
+        {showScrollToBottom && (
+          <Button
+            onClick={() => {
+              scrollToBottom();
+              setNewMessageCount(0);
+            }}
+            className="absolute right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
+            style={{ bottom: isKeyboardVisible ? '90px' : '20px', transition: 'bottom 0.2s' }}
+            size="sm"
+          >
+            <ChevronDown className="h-5 w-5" />
+            {newMessageCount > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500">
+                {newMessageCount > 9 ? '9+' : newMessageCount}
+              </Badge>
+            )}
+          </Button>
+        )}
+      </div>
 
         {/* Message Input - Sticky Footer - Always visible */}
         <div
           className={cn(
             "sticky bottom-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95",
-            isSidebarOpen ? "z-0" : "z-50" // Conditional z-index but always accessible
+            isSidebarOpen ? "z-0" : "z-50"
           )}
           style={{
-            // Ensure the input sits directly on top of the keyboard
-            bottom: isKeyboardVisible ? '0' : '0',
-            paddingBottom: isKeyboardVisible ? '8px' : '16px',
+            bottom: 0,
+            paddingBottom: isKeyboardVisible ? 'env(safe-area-inset-bottom, 8px)' : '16px',
+            transition: 'padding-bottom 0.2s',
           }}
         >
           {/* Subtle top border indicator */}
