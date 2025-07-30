@@ -694,23 +694,21 @@ export default function ChatPage() {
     const handleViewportChange = () => {
       if (typeof window !== 'undefined' && window.visualViewport) {
         const viewport = window.visualViewport;
-        const isKeyboardOpen = viewport.height < window.innerHeight * 0.85; // More sensitive detection
+        const isKeyboardOpen = viewport.height < window.innerHeight * 0.9; // More sensitive detection
         setIsKeyboardVisible(isKeyboardOpen);
         
-        // Force re-render to update footer position
-        setTimeout(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.style.height = isKeyboardOpen 
-              ? `${viewport.height}px` 
-              : '100vh';
-          }
-        }, 100);
+        // Force re-render to update footer position immediately
+        if (chatContainerRef.current) {
+          chatContainerRef.current.style.height = isKeyboardOpen 
+            ? `${viewport.height}px` 
+            : '100vh';
+        }
         
         // If keyboard is open, scroll to bottom immediately
         if (isKeyboardOpen) {
           setTimeout(() => {
             scrollToBottom();
-          }, 150);
+          }, 50);
         }
       }
     };
@@ -1382,7 +1380,7 @@ export default function ChatPage() {
           height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
             ? `${window.visualViewport?.height || window.innerHeight}px` 
             : "100vh",
-          paddingBottom: '72px' // Fixed padding for footer height
+          paddingBottom: '60px' // Fixed padding for footer height
         }}
       >
         {/* Sticky Header - Always visible with conditional z-index */}
@@ -1567,7 +1565,7 @@ export default function ChatPage() {
                 scrollToBottom();
                 setNewMessageCount(0);
               }}
-              className="absolute bottom-24 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
+              className="absolute bottom-20 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
               size="sm"
             >
               <ChevronDown className="h-5 w-5" />
@@ -1589,9 +1587,10 @@ export default function ChatPage() {
           style={{
             // Ensure the input sits directly on top of the keyboard
             bottom: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
-              ? `${window.visualViewport.height - 72}px` // Position above keyboard with exact height
+              ? `${window.visualViewport.height - 60}px` // Position exactly at keyboard top
               : '0',
-            paddingBottom: isKeyboardVisible ? '8px' : '16px',
+            paddingBottom: isKeyboardVisible ? '0px' : '16px',
+            transition: 'bottom 0.1s ease-out', // Smooth transition
           }}
         >
           {/* Subtle top border indicator */}
