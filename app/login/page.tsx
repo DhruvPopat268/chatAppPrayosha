@@ -49,8 +49,7 @@ export default function LoginPage() {
               <MessageCircle className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">telepathy</CardTitle>
-          <CardDescription>Sign in to your account to continue chatting</CardDescription>
+          <CardTitle className="text-2xl font-bold">Telepathy</CardTitle>
         </CardHeader>
         <form action={handleSubmit}>
           <CardContent className="space-y-4">
