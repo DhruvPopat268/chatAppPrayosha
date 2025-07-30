@@ -1478,6 +1478,13 @@ export default function ChatPage() {
                           ? `Last seen ${Math.round((Date.now() - contactStatus.lastSeen) / 60000)} min ago`
                           : ""}
                   </p>
+                  {/* Connection Status Indicator */}
+                  <div className="flex items-center space-x-1 mt-1">
+                    <div className={`w-2 h-2 rounded-full ${socketManager.isReadyForCalls() ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-xs text-gray-400">
+                      {socketManager.isReadyForCalls() ? 'Connected' : 'Disconnected'}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -1486,12 +1493,26 @@ export default function ChatPage() {
                   variant="ghost"
                   size="sm"
                   className="p-2 rounded-full hover:bg-gray-100"
-                  onClick={() => {
+                  onClick={async () => {
                     if (webrtcManager && selectedContact) {
-                      webrtcManager.startVoiceCall(selectedContact.id)
+                      console.log('Starting voice call to:', selectedContact.id);
+                      console.log('Socket status:', socketManager.getConnectionStatus());
+                      console.log('WebRTC manager state:', webrtcManager.getConnectionDiagnostics());
+                      
+                      const success = await webrtcManager.startVoiceCall(selectedContact.id);
+                      if (!success) {
+                        console.error('Failed to start voice call');
+                      }
+                    } else {
+                      console.error('Cannot start voice call:', {
+                        webrtcManager: !!webrtcManager,
+                        selectedContact: !!selectedContact,
+                        socketReady: socketManager.isReadyForCalls()
+                      });
                     }
                   }}
-                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || !socketManager.isReadyForCalls()}
+                  title={!socketManager.isReadyForCalls() ? "Not connected to server" : "Start voice call"}
                 >
                   <Phone className="h-4 w-4" />
                 </Button>
@@ -1500,12 +1521,26 @@ export default function ChatPage() {
                   variant="ghost"
                   size="sm"
                   className="p-2 rounded-full hover:bg-gray-100"
-                  onClick={() => {
+                  onClick={async () => {
                     if (webrtcManager && selectedContact) {
-                      webrtcManager.startVideoCall(selectedContact.id)
+                      console.log('Starting video call to:', selectedContact.id);
+                      console.log('Socket status:', socketManager.getConnectionStatus());
+                      console.log('WebRTC manager state:', webrtcManager.getConnectionDiagnostics());
+                      
+                      const success = await webrtcManager.startVideoCall(selectedContact.id);
+                      if (!success) {
+                        console.error('Failed to start video call');
+                      }
+                    } else {
+                      console.error('Cannot start video call:', {
+                        webrtcManager: !!webrtcManager,
+                        selectedContact: !!selectedContact,
+                        socketReady: socketManager.isReadyForCalls()
+                      });
                     }
                   }}
-                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || !socketManager.isReadyForCalls()}
+                  title={!socketManager.isReadyForCalls() ? "Not connected to server" : "Start video call"}
                 >
                   <Video className="h-4 w-4" />
                 </Button>

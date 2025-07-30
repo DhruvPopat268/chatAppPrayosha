@@ -7,6 +7,9 @@ import { getToken } from './clientAuth'
 class SocketManager {
   private socket: Socket | null = null
   private isConnected = false
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 5
+  private reconnectDelay = 1000
 
   connect() {
     if (this.socket && this.isConnected) {
@@ -21,25 +24,49 @@ class SocketManager {
 
     this.socket = io(config.getBackendUrl(), {
       transports: ['websocket', 'polling'],
-      autoConnect: true
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: this.reconnectDelay,
+      timeout: 20000
     })
 
     this.socket.on('connect', () => {
       console.log('Socket connected')
       this.isConnected = true
+      this.reconnectAttempts = 0
       
       // Authenticate the socket connection
       this.socket?.emit('authenticate', token)
     })
 
-    this.socket.on('disconnect', () => {
-      console.log('Socket disconnected')
+    this.socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason)
       this.isConnected = false
+      
+      // Attempt to reconnect if it's not a manual disconnect
+      if (reason === 'io server disconnect' || reason === 'io client disconnect') {
+        console.log('Manual disconnect, not attempting to reconnect')
+      } else {
+        console.log('Unexpected disconnect, attempting to reconnect...')
+      }
+    })
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error)
+      this.isConnected = false
+      this.reconnectAttempts++
+      
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached')
+        alert('Connection to server failed. Please refresh the page and try again.')
+      }
     })
 
     this.socket.on('auth_error', (error) => {
       console.error('Socket authentication failed:', error)
       this.disconnect()
+      alert('Authentication failed. Please log in again.')
     })
 
     return this.socket
@@ -50,6 +77,7 @@ class SocketManager {
       this.socket.disconnect()
       this.socket = null
       this.isConnected = false
+      this.reconnectAttempts = 0
     }
   }
 
@@ -59,6 +87,11 @@ class SocketManager {
 
   isSocketConnected(): boolean {
     return this.isConnected && this.socket?.connected === true
+  }
+
+  // Check if socket is ready for WebRTC calls
+  isReadyForCalls(): boolean {
+    return this.isSocketConnected() && this.socket?.id !== undefined
   }
 
   // Send a message
@@ -133,6 +166,17 @@ class SocketManager {
     this.socket.removeAllListeners('message_error')
     this.socket.removeAllListeners('user_typing')
     this.socket.removeAllListeners('user_stopped_typing')
+  }
+
+  // Get connection status for debugging
+  getConnectionStatus() {
+    return {
+      connected: this.isConnected,
+      socketConnected: this.socket?.connected || false,
+      socketId: this.socket?.id,
+      readyForCalls: this.isReadyForCalls(),
+      reconnectAttempts: this.reconnectAttempts
+    }
   }
 }
 

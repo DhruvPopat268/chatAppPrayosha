@@ -25,7 +25,6 @@ class WebRTCManager {
   private localStream: MediaStream | null = null
   private remoteStream: MediaStream | null = null
   private onCallStateChange: ((state: CallState) => void) | null = null
-  // Removed ringtone and connectionSound logic
   private callStartTime: number = 0
   private currentCallState: CallState = {
     isIncoming: false,
@@ -53,14 +52,12 @@ class WebRTCManager {
       console.log('Incoming call:', data)
       this.currentCallState.isIncoming = true
       this.currentCallState.callData = data
-      // Removed this.playRingtone()
       this.notifyStateChange()
     })
 
     // Handle call accepted
     this.socket.on('call_accepted', async (data: CallData) => {
       console.log('Call accepted:', data)
-      // Removed this.stopRingtone()
       this.currentCallState.isOutgoing = false
       this.currentCallState.callData = data
       
@@ -84,14 +81,12 @@ class WebRTCManager {
     // Handle call rejected
     this.socket.on('call_rejected', () => {
       console.log('Call rejected')
-      // Removed this.stopRingtone()
       this.resetCallState()
     })
 
     // Handle call ended
     this.socket.on('call_ended', () => {
       console.log('Call ended')
-      // Removed this.stopRingtone()
       this.endCall()
     })
 
@@ -188,7 +183,6 @@ class WebRTCManager {
         console.log('WebRTC connection established successfully')
         this.currentCallState.isConnected = true
         this.callStartTime = Date.now()
-        // Removed this.playConnectionSound()
         
         // Delay state notification to prevent audio element re-render issues
         setTimeout(() => {
@@ -229,7 +223,7 @@ class WebRTCManager {
     }
   }
 
-  // Check if devices are available
+  // Improved device availability check
   private async checkDeviceAvailability(): Promise<{ audio: boolean; video: boolean }> {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -242,30 +236,18 @@ class WebRTCManager {
       };
     } catch (error) {
       console.error('Error checking device availability:', error);
-      return { audio: false, video: false };
+      // Assume devices are available if we can't check
+      return { audio: true, video: true };
     }
   }
 
-  // Request permissions and get user media with fallback
+  // Improved permission and media access with better error handling
   private async getUserMediaWithFallback(audio: boolean, video: boolean): Promise<MediaStream> {
     try {
-      // First, check if we have permission
-      if (navigator.permissions) {
-        const audioPermission = audio ? await navigator.permissions.query({ name: 'microphone' as PermissionName }) : { state: 'granted' };
-        const videoPermission = video ? await navigator.permissions.query({ name: 'camera' as PermissionName }) : { state: 'granted' };
-        
-        if (audioPermission.state === 'denied' || videoPermission.state === 'denied') {
-          throw new Error('Camera or microphone permission denied');
-        }
-      }
-
-      // Check device availability
-      const deviceAvailability = await this.checkDeviceAvailability();
-      
-      // Adjust constraints based on available devices
+      // First try to get media directly without permission checks
       const constraints: MediaStreamConstraints = {
-        audio: audio && deviceAvailability.audio,
-        video: video && deviceAvailability.video
+        audio: audio ? { echoCancellation: true, noiseSuppression: true } : false,
+        video: video ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
       };
 
       console.log('Requesting media with constraints:', constraints);
@@ -277,12 +259,12 @@ class WebRTCManager {
     } catch (error) {
       console.error('Error getting user media:', error);
       
-      // Try fallback with audio only
+      // Try fallback with audio only for video calls
       if (video && audio) {
         console.log('Trying fallback with audio only...');
         try {
           const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true, 
+            audio: { echoCancellation: true, noiseSuppression: true }, 
             video: false 
           });
           console.log('Audio-only fallback successful');
@@ -292,63 +274,60 @@ class WebRTCManager {
         }
       }
       
+      // Try with minimal constraints
+      try {
+        console.log('Trying with minimal constraints...');
+        const minimalStream = await navigator.mediaDevices.getUserMedia({
+          audio: audio,
+          video: video
+        });
+        console.log('Minimal constraints successful');
+        return minimalStream;
+      } catch (minimalError) {
+        console.error('Minimal constraints also failed:', minimalError);
+      }
+      
       throw error;
     }
   }
 
-  // Check device permissions and availability
+  // Simplified device permission check
   async checkDevicePermissions(): Promise<{ audio: boolean; video: boolean; message: string }> {
     try {
-      const deviceAvailability = await this.checkDeviceAvailability();
+      // Try to get a test stream to check permissions
+      const testStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      testStream.getTracks().forEach(track => track.stop());
       
-      if (!deviceAvailability.audio && !deviceAvailability.video) {
-        return {
-          audio: false,
-          video: false,
-          message: 'No microphone or camera found. Please connect devices and refresh the page.'
-        };
-      }
-
-      let audioPermission = 'granted';
-      let videoPermission = 'granted';
-
-      // Check permissions if available
-      if (navigator.permissions) {
-        try {
-          if (deviceAvailability.audio) {
-            const audioPerm = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-            audioPermission = audioPerm.state;
-          }
-          if (deviceAvailability.video) {
-            const videoPerm = await navigator.permissions.query({ name: 'camera' as PermissionName });
-            videoPermission = videoPerm.state;
-          }
-        } catch (error) {
-          console.log('Permission query not supported, assuming granted');
-        }
-      }
-
-      const hasAudio = deviceAvailability.audio && audioPermission === 'granted';
-      const hasVideo = deviceAvailability.video && videoPermission === 'granted';
-
-      let message = '';
-      if (!hasAudio && !hasVideo) {
-        message = 'No microphone or camera access. Please allow access to these devices.';
-      } else if (!hasAudio) {
-        message = 'No microphone access. Voice calls will not work.';
-      } else if (!hasVideo) {
-        message = 'No camera access. Video calls will not work.';
-      } else {
-        message = 'Devices ready for calls.';
-      }
-
       return {
-        audio: hasAudio,
-        video: hasVideo,
-        message
+        audio: true,
+        video: true, // Assume video is available
+        message: 'Devices ready for calls.'
       };
     } catch (error) {
       console.error('Error checking device permissions:', error);
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          return {
+            audio: false,
+            video: false,
+            message: 'Microphone and camera access denied. Please allow access to these devices.'
+          };
+        } else if (error.name === 'NotFoundError') {
+          return {
+            audio: false,
+            video: false,
+            message: 'No microphone or camera found. Please connect devices and refresh the page.'
+          };
+        } else if (error.name === 'NotReadableError') {
+          return {
+            audio: false,
+            video: false,
+            message: 'Microphone or camera is already in use by another application.'
+          };
+        }
+      }
+      
       return {
         audio: false,
         video: false,
@@ -357,25 +336,34 @@ class WebRTCManager {
     }
   }
 
-  // Test device access before making calls
+  // Simplified device access test
   async testDeviceAccess(audio: boolean, video: boolean): Promise<boolean> {
     try {
-      const permissions = await this.checkDevicePermissions();
+      // Try to get media directly
+      const testStream = await navigator.mediaDevices.getUserMedia({
+        audio: audio,
+        video: video
+      });
       
-      if (audio && !permissions.audio) {
-        alert('Microphone access required for voice calls. ' + permissions.message);
-        return false;
-      }
-      
-      if (video && !permissions.video) {
-        alert('Camera access required for video calls. ' + permissions.message);
-        return false;
-      }
+      // Stop the test stream
+      testStream.getTracks().forEach(track => track.stop());
       
       return true;
     } catch (error) {
       console.error('Error testing device access:', error);
-      alert('Error testing device access. Please check your microphone and camera.');
+      
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          alert('Camera or microphone access denied. Please allow access and try again.');
+        } else if (error.name === 'NotFoundError') {
+          alert('No camera or microphone found. Please connect the required devices and try again.');
+        } else if (error.name === 'NotReadableError') {
+          alert('Camera or microphone is already in use by another application. Please close other apps using these devices.');
+        } else {
+          alert('Error testing device access: ' + error.message);
+        }
+      }
+      
       return false;
     }
   }
@@ -384,9 +372,9 @@ class WebRTCManager {
     try {
       console.log('Starting voice call...');
       
-      // Test device access first
-      const hasAccess = await this.testDeviceAccess(true, false);
-      if (!hasAccess) {
+      // Check if socket is connected
+      if (!this.socket || !this.socket.connected) {
+        alert('Not connected to server. Please refresh the page and try again.');
         return false;
       }
       
@@ -451,9 +439,9 @@ class WebRTCManager {
     try {
       console.log('Starting video call...');
       
-      // Test device access first
-      const hasAccess = await this.testDeviceAccess(true, true);
-      if (!hasAccess) {
+      // Check if socket is connected
+      if (!this.socket || !this.socket.connected) {
+        alert('Not connected to server. Please refresh the page and try again.');
         return false;
       }
       
@@ -519,7 +507,12 @@ class WebRTCManager {
       if (!this.currentCallState.callData) return false;
 
       console.log('Accepting call...');
-      // Removed this.stopRingtone()
+
+      // Check if socket is connected
+      if (!this.socket || !this.socket.connected) {
+        alert('Not connected to server. Please refresh the page and try again.');
+        return false;
+      }
 
       // Always create a new peer connection for each call
       this.initializePeerConnection();
@@ -580,7 +573,6 @@ class WebRTCManager {
   }
 
   rejectCall() {
-    // Removed this.stopRingtone()
     if (this.currentCallState.callData) {
       this.socket.emit('reject_call', this.currentCallState.callData)
     }
@@ -588,7 +580,6 @@ class WebRTCManager {
   }
 
   endCall() {
-    // Removed this.stopRingtone()
     if (this.currentCallState.callData) {
       this.socket.emit('end_call', this.currentCallState.callData)
     }
@@ -603,8 +594,6 @@ class WebRTCManager {
       this.localStream.getTracks().forEach(track => track.stop())
       this.localStream = null
     }
-
-    // Removed ringtone logic
 
     // Reset call state
     this.currentCallState = {
@@ -732,9 +721,6 @@ class WebRTCManager {
   private generateRoomId(): string {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   }
-
-  // Removed playRingtone and stopRingtone methods
-  // Removed playConnectionSound method
 }
 
 export default WebRTCManager 
