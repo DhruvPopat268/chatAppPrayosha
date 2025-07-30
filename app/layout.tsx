@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Chat App',
+  title: 'Telepathy',
   description: 'Real-time chat application with voice and video calls',
   generator: 'v0.dev',
   icons: {
