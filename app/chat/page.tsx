@@ -1,12 +1,16 @@
 "use client"
-      <div
-        ref={chatContainerRef}
-        className={cn(
-          'flex-1 flex flex-col bg-white min-h-0',
-          isSidebarOpen ? 'z-0' : 'z-10'
-        )}
-        style={{ minHeight: 0, height: '100dvh', maxHeight: '100dvh' }}
-      >
+      
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Phone,
   Video,
   Paperclip,
   Send,
