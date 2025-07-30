@@ -697,20 +697,11 @@ export default function ChatPage() {
         const isKeyboardOpen = viewport.height < window.innerHeight * 0.85; // More sensitive detection
         setIsKeyboardVisible(isKeyboardOpen);
         
-        // Force re-render to update footer position
-        setTimeout(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.style.height = isKeyboardOpen 
-              ? `${viewport.height}px` 
-              : '100vh';
-          }
-        }, 100);
-        
         // If keyboard is open, scroll to bottom immediately
         if (isKeyboardOpen) {
           setTimeout(() => {
             scrollToBottom();
-          }, 150);
+          }, 50);
         }
       }
     };
@@ -1241,7 +1232,7 @@ export default function ChatPage() {
                       <DropdownMenuContent>
                         <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                           <User className="h-4 w-4 mr-2" />
-                          My Account
+                          My Profile
                         </DropdownMenuItem>
                         {/* <DropdownMenuItem onClick={enableNotifications}>
                           <Bell className="mr-2 h-4 w-4" />
@@ -1381,8 +1372,7 @@ export default function ChatPage() {
         style={{
           height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
             ? `${window.visualViewport?.height || window.innerHeight}px` 
-            : "100vh",
-          paddingBottom: '72px' // Fixed padding for footer height
+            : "100vh"
         }}
       >
         {/* Sticky Header - Always visible with conditional z-index */}
@@ -1479,11 +1469,11 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Messages - Scrollable area */}
+        {/* Messages - Scrollable area with proper spacing for sticky footer */}
         <div className="flex-1 overflow-hidden relative">
           <ScrollArea 
             ref={scrollAreaRef}
-            className="h-full p-4" // Removed bottom padding to eliminate blank space
+            className="h-full p-4 pb-20" // Reduced bottom padding to prevent overlap
             onScroll={handleScroll}
           >
             <div className="space-y-4 pb-4">
@@ -1567,7 +1557,7 @@ export default function ChatPage() {
                 scrollToBottom();
                 setNewMessageCount(0);
               }}
-              className="absolute bottom-24 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
+              className="absolute bottom-20 right-4 rounded-full w-12 h-12 p-0 bg-blue-500 hover:bg-blue-600 text-white shadow-lg z-10"
               size="sm"
             >
               <ChevronDown className="h-5 w-5" />
@@ -1580,17 +1570,15 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Message Input - Fixed Footer */}
+        {/* Message Input - Sticky Footer - Always visible */}
         <div
           className={cn(
-            "fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95 z-50",
-            isSidebarOpen ? "md:left-80" : "md:left-12" // Adjust for sidebar state
+            "sticky bottom-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95",
+            isSidebarOpen ? "z-0" : "z-50" // Conditional z-index but always accessible
           )}
           style={{
             // Ensure the input sits directly on top of the keyboard
-            bottom: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
-              ? `${window.visualViewport.height - 72}px` // Position above keyboard with exact height
-              : '0',
+            bottom: isKeyboardVisible ? '0' : '0',
             paddingBottom: isKeyboardVisible ? '8px' : '16px',
           }}
         >
@@ -1598,44 +1586,39 @@ export default function ChatPage() {
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 opacity-50"></div>
           
           <div className="flex items-center space-x-2">
-            {/* Media Upload Buttons */}
-            <div className="flex items-center space-x-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleImageButtonClick} 
-                disabled={isUploadingImage}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                title="Send image"
-              >
-                <ImageIcon className="h-4 w-4" />
-              </Button>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageChange}
-              />
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleFileButtonClick} 
-                disabled={isUploadingImage}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                title="Send file"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-            </div>
-            
-            {/* Message Input Field */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleImageButtonClick} 
+              disabled={isUploadingImage}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              title="Send image"
+            >
+              <ImageIcon className="h-4 w-4" />
+            </Button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageChange}
+            />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleFileButtonClick} 
+              disabled={isUploadingImage}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              title="Send file"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+            />
             <div className="flex-1 relative">
               <Input
                 ref={messageInputRef}
@@ -1651,8 +1634,6 @@ export default function ChatPage() {
                 }}
               />
             </div>
-            
-            {/* Send Button */}
             <div 
               className="flex-shrink-0"
               onMouseDown={(e) => e.preventDefault()}
@@ -1691,7 +1672,7 @@ export default function ChatPage() {
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>My Account</DialogTitle>
+            <DialogTitle>My Profile</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             {/* Avatar Section */}
