@@ -19,8 +19,8 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:3000",
   "https://chat-app-prayosha.vercel.app/",
-  "https://chat-app-prayosha-git-master-dhruvs-projects-cffe63d8.vercel.app/",
-  "https://chat-app-prayosha-hl15k3spo-dhruvs-projects-cffe63d8.vercel.app/"
+  "https://chat-app-prayosha-git-master-dhruvs-projects-cffe63d8.vercel.app",
+  "https://chat-app-prayosha-hl15k3spo-dhruvs-projects-cffe63d8.vercel.app"
 ];
 
 app.use(cors({
