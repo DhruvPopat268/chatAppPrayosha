@@ -6,7 +6,7 @@ const router = express.Router();
 // Get all contacts for a user
 router.get('/', async (req, res) => {
   try {
-    const contacts = await Contact.find({ userId: req.user.userId })
+    const contacts = await Contact.find({ userId: req.user._id })
       .populate('contactId', 'username email _id')
       .select('-__v');
     
@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
       const orphanedIds = orphanedContacts.map(contact => contact._id);
       Contact.deleteMany({ _id: { $in: orphanedIds } })
         .then(() => {
-          console.log(`Auto-cleaned up ${orphanedContacts.length} orphaned contacts for user ${req.user.userId}`);
+          console.log(`Auto-cleaned up ${orphanedContacts.length} orphaned contacts for user ${req.user._id}`);
         })
         .catch(err => {
           console.error('Error auto-cleaning orphaned contacts:', err);
@@ -53,7 +53,7 @@ router.post('/', async (req, res) => {
   }
 
   // Prevent adding yourself as a contact
-  if (contactId === req.user.userId) {
+  if (contactId === req.user._id) {
     return res.status(400).json({ error: "Cannot add yourself as a contact" });
   }
 
@@ -66,7 +66,7 @@ router.post('/', async (req, res) => {
 
     // Check if already a contact
     const existingContact = await Contact.findOne({
-      userId: req.user.userId,
+      userId: req.user._id,
       contactId: contactId
     });
 
@@ -76,14 +76,14 @@ router.post('/', async (req, res) => {
 
     // Add contact (mutual relationship)
     const newContact = await Contact.create({
-      userId: req.user.userId,
+      userId: req.user._id,
       contactId: contactId
     });
 
     // Also add the reverse relationship
     const reverseContact = await Contact.create({
       userId: contactId,
-      contactId: req.user.userId
+      contactId: req.user._id
     });
 
     res.status(201).json({ 
@@ -123,8 +123,8 @@ router.delete('/:contactId', async (req, res) => {
     // Remove both directions of the relationship
     await Contact.deleteMany({
       $or: [
-        { userId: req.user.userId, contactId: contactId },
-        { userId: contactId, contactId: req.user.userId }
+        { userId: req.user._id, contactId: contactId },
+        { userId: contactId, contactId: req.user._id }
       ]
     });
 
@@ -139,7 +139,7 @@ router.delete('/:contactId', async (req, res) => {
 router.post('/cleanup', async (req, res) => {
   try {
     // Find all contacts for the current user
-    const userContacts = await Contact.find({ userId: req.user.userId });
+    const userContacts = await Contact.find({ userId: req.user._id });
     
     // Check which contacts reference valid users
     const validContactIds = [];
@@ -157,7 +157,7 @@ router.post('/cleanup', async (req, res) => {
     // Remove orphaned contacts
     if (orphanedContactIds.length > 0) {
       await Contact.deleteMany({ _id: { $in: orphanedContactIds } });
-      console.log(`Cleaned up ${orphanedContactIds.length} orphaned contacts for user ${req.user.userId}`);
+      console.log(`Cleaned up ${orphanedContactIds.length} orphaned contacts for user ${req.user._id}`);
     }
     
     res.json({ 
@@ -174,7 +174,7 @@ router.post('/cleanup', async (req, res) => {
 // Debug endpoint to check contact status
 router.get('/debug', async (req, res) => {
   try {
-    const contacts = await Contact.find({ userId: req.user.userId })
+    const contacts = await Contact.find({ userId: req.user._id })
       .populate('contactId', 'username email _id')
       .select('-__v');
     

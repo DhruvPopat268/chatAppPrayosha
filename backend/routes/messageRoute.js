@@ -12,8 +12,8 @@ router.get('/:receiverId', async (req, res) => {
 
     const messages = await Message.find({
       $or: [
-        { senderId: req.user.userId, receiverId: receiverId },
-        { senderId: receiverId, receiverId: req.user.userId }
+        { senderId: req.user._id, receiverId: receiverId },
+        { senderId: receiverId, receiverId: req.user._id }
       ]
     })
     .sort({ createdAt: -1 })
@@ -27,7 +27,7 @@ router.get('/:receiverId', async (req, res) => {
     await Message.updateMany(
       {
         senderId: receiverId,
-        receiverId: req.user.userId,
+        receiverId: req.user._id,
         isRead: false
       },
       { isRead: true }
@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
     }
 
     const message = await Message.create({
-      senderId: req.user.userId,
+      senderId: req.user._id,
       receiverId,
       content,
       type,
@@ -77,7 +77,7 @@ router.put('/read/:senderId', async (req, res) => {
     await Message.updateMany(
       {
         senderId: senderId,
-        receiverId: req.user.userId,
+        receiverId: req.user._id,
         isRead: false
       },
       { isRead: true }
@@ -96,7 +96,7 @@ router.get('/unread/count', async (req, res) => {
     const unreadCounts = await Message.aggregate([
       {
         $match: {
-          receiverId: new mongoose.Types.ObjectId(req.user.userId),
+          receiverId: new mongoose.Types.ObjectId(req.user._id),
           isRead: false
         }
       },
@@ -122,8 +122,8 @@ router.delete('/:receiverId', async (req, res) => {
     // Delete messages where current user is sender or receiver and receiverId is the other party
     await Message.deleteMany({
       $or: [
-        { senderId: req.user.userId, receiverId: receiverId },
-        { senderId: receiverId, receiverId: req.user.userId }
+        { senderId: req.user._id, receiverId: receiverId },
+        { senderId: receiverId, receiverId: req.user._id }
       ]
     });
     res.json({ message: 'Chat history deleted successfully' });
