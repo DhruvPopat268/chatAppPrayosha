@@ -38,6 +38,7 @@ import {
   ChevronDown,
   MessageSquare,
   Bug,
+  Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -396,6 +397,12 @@ export default function ChatPage() {
     const initializeOneSignal = async () => {
       try {
         console.log('🚀 Starting OneSignal initialization for user:', currentUser.id);
+        
+        // Check environment configuration first
+        if (!checkOneSignalEnvironment()) {
+          console.error('❌ OneSignal environment not properly configured');
+          return;
+        }
         
         // Use the proper initialization function
         const playerId = await initializeOneSignalProperly();
@@ -1330,17 +1337,76 @@ export default function ChatPage() {
     }
   };
 
-  const initializeOneSignalProperly = async () => {
-    console.log('🚀 Starting proper OneSignal initialization...');
+  const initializeOneSignalSimple = async () => {
+    console.log('🔄 Trying simple OneSignal initialization...');
     
     try {
       if (!OneSignal) {
-        console.log('📦 Loading OneSignal module...');
         const module = await import('react-onesignal');
         OneSignal = module.default;
       }
 
+      // Simple initialization with minimal options
+      await OneSignal.init({
+        appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath: '/OneSignalSDKWorker.js',
+        serviceWorkerParam: { scope: '/' }
+      });
+
+      console.log('✅ Simple OneSignal initialization successful');
+      
+      // Wait for initialization
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Try to get player ID
+      try {
+        const playerId = await OneSignal.User.PushSubscription.id;
+        console.log('🎯 Simple init - Player ID:', playerId);
+        return playerId || null;
+      } catch (idError) {
+        console.log('⚠️ Simple init - No Player ID available yet');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ Simple OneSignal initialization failed:', error);
+      return null;
+    }
+  };
+
+  const initializeOneSignalProperly = async () => {
+    console.log('🚀 Starting proper OneSignal initialization...');
+    
+    try {
+      // First, ensure OneSignal is loaded properly
+      if (!OneSignal) {
+        console.log('📦 Loading OneSignal module...');
+        try {
+          const module = await import('react-onesignal');
+          OneSignal = module.default;
+          console.log('✅ OneSignal module loaded successfully');
+        } catch (importError) {
+          console.error('❌ Failed to import OneSignal module:', importError);
+          return null;
+        }
+      }
+
+      // Check if OneSignal is already initialized
+      try {
+        const isInitialized = await OneSignal.Notifications.isPushSupported();
+        if (isInitialized) {
+          console.log('✅ OneSignal already initialized');
+          const playerId = await OneSignal.User.PushSubscription.id;
+          return playerId || null;
+        }
+      } catch (checkError) {
+        console.log('OneSignal not yet initialized, proceeding with init...');
+      }
+
       console.log('🔧 Initializing OneSignal with proper configuration...');
+      
+      // Wait a bit before initialization to ensure everything is ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       await OneSignal.init({
         appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
@@ -1353,9 +1419,9 @@ export default function ChatPage() {
         welcomeNotification: {
           disable: true,
         },
-        // Add these options to ensure proper setup
-        autoRegister: true,
-        autoResubscribe: true,
+        // Simplified configuration to avoid initialization issues
+        autoRegister: false,
+        autoResubscribe: false,
         persistNotification: false
       });
 
@@ -1365,38 +1431,50 @@ export default function ChatPage() {
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Check if push is supported
-      const isSupported = await OneSignal.Notifications.isPushSupported();
-      console.log('📱 Push notifications supported:', isSupported);
-      
-      if (isSupported) {
-        // Request permission if not already granted
-        const permission = await OneSignal.Notifications.permission;
-        console.log('🔔 Current permission:', permission);
+      try {
+        const isSupported = await OneSignal.Notifications.isPushSupported();
+        console.log('📱 Push notifications supported:', isSupported);
         
-        if (permission === 'default') {
-          console.log('🔔 Requesting notification permission...');
-          await OneSignal.Notifications.requestPermission();
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-        
-        // Get the player ID
-        const playerId = await OneSignal.User.PushSubscription.id;
-        console.log('🎯 OneSignal Player ID:', playerId);
-        
-        if (playerId) {
-          console.log('✅ OneSignal properly initialized with Player ID');
-          return playerId;
+        if (isSupported) {
+          // Request permission if not already granted
+          const permission = await OneSignal.Notifications.permission;
+          console.log('🔔 Current permission:', permission);
+          
+          if (permission === 'default') {
+            console.log('🔔 Requesting notification permission...');
+            await OneSignal.Notifications.requestPermission();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          // Get the player ID
+          const playerId = await OneSignal.User.PushSubscription.id;
+          console.log('🎯 OneSignal Player ID:', playerId);
+          
+          if (playerId) {
+            console.log('✅ OneSignal properly initialized with Player ID');
+            return playerId;
+          } else {
+            console.log('⚠️ OneSignal initialized but no Player ID yet');
+          }
         } else {
-          console.log('⚠️ OneSignal initialized but no Player ID yet');
+          console.log('⚠️ Push notifications not supported');
         }
-      } else {
-        console.log('⚠️ Push notifications not supported');
+      } catch (apiError) {
+        console.error('❌ Error accessing OneSignal API:', apiError);
       }
       
       return null;
     } catch (error) {
       console.error('❌ OneSignal initialization failed:', error);
-      return null;
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      // Try simple initialization as fallback
+      console.log('🔄 Trying simple initialization as fallback...');
+      return await initializeOneSignalSimple();
     }
   };
 
@@ -1433,6 +1511,34 @@ export default function ChatPage() {
       console.error('❌ Error clearing OneSignal IndexedDB:', error);
       alert('Error clearing OneSignal IndexedDB');
     }
+  };
+
+  const checkOneSignalEnvironment = () => {
+    console.log('🔍 Checking OneSignal environment configuration...');
+    
+    const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+    const hasAppId = !!appId;
+    
+    console.log('📋 Environment check results:');
+    console.log('  - NEXT_PUBLIC_ONESIGNAL_APP_ID:', hasAppId ? '✅ Set' : '❌ Not set');
+    console.log('  - App ID value:', appId || 'undefined');
+    console.log('  - App ID length:', appId?.length || 0);
+    console.log('  - Is valid format:', appId?.length === 36 ? '✅ Yes' : '❌ No');
+    
+    if (!hasAppId) {
+      console.error('❌ NEXT_PUBLIC_ONESIGNAL_APP_ID is not set in environment variables');
+      alert('OneSignal App ID is not configured. Please check your .env.local file.');
+      return false;
+    }
+    
+    if (appId.length !== 36) {
+      console.error('❌ OneSignal App ID format is invalid (should be 36 characters)');
+      alert('OneSignal App ID format is invalid. Please check your configuration.');
+      return false;
+    }
+    
+    console.log('✅ OneSignal environment configuration is valid');
+    return true;
   };
 
   return (
@@ -1620,6 +1726,10 @@ export default function ChatPage() {
                         <DropdownMenuItem onClick={debugSubscriptionProcess}>
                           <Bug className="mr-2 h-4 w-4" />
                           Debug Subscription Process
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={checkOneSignalEnvironment}>
+                          <Settings className="mr-2 h-4 w-4" />
+                          Check OneSignal Environment
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={clearOneSignalIndexedDB}>
                           <Bug className="mr-2 h-4 w-4" />
