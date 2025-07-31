@@ -37,6 +37,7 @@ import {
   Bell,
   ChevronDown,
   MessageSquare,
+  Bug,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -232,56 +233,99 @@ export default function ChatPage() {
 
 
   const getAndSaveSubscriptionId = async () => {
+    console.log('🚀 Starting getAndSaveSubscriptionId...');
+    console.log('👤 Current user:', currentUser);
+    
     try {
       // First try to get from OneSignal directly
       if (OneSignal) {
+        console.log('🔍 Trying OneSignal direct method...');
         try {
           const isSubscribed = await OneSignal.Notifications.isPushSupported();
+          console.log('📱 Push supported:', isSubscribed);
+          
           if (isSubscribed) {
             const playerId = await OneSignal.User.PushSubscription.id;
+            console.log('🎯 Got Player ID from OneSignal:', playerId);
+            
             if (playerId) {
-              console.log('✅ Got Player ID from OneSignal:', playerId);
+              console.log('✅ Using OneSignal Player ID');
               await saveSubscriptionId(playerId);
-              setNotifEnabled(true);
               return;
+            } else {
+              console.log('⚠️ OneSignal Player ID is null/undefined');
             }
+          } else {
+            console.log('⚠️ Push notifications not supported');
           }
         } catch (oneSignalError) {
-          console.log('OneSignal direct method failed, trying IndexedDB...');
+          console.log('❌ OneSignal direct method failed:', oneSignalError);
+          console.log('🔄 Falling back to IndexedDB method...');
         }
+      } else {
+        console.log('⚠️ OneSignal not available, trying IndexedDB...');
       }
       
       // Fallback to IndexedDB method
+      console.log('🗄️ Trying IndexedDB method...');
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
       console.log('✅ Got Subscription ID from IndexedDB:', subscriptionId);
       await saveSubscriptionId(subscriptionId);
-      setNotifEnabled(true);
     } catch (e) {
       console.error('❌ Failed to get or save Subscription ID:', e);
+      console.error('❌ Error details:', {
+        message: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+        name: e instanceof Error ? e.name : 'Unknown'
+      });
       setNotifEnabled(false);
     }
   };
 
 
   const saveSubscriptionId = async (subscriptionId: string) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      console.error('❌ No current user found, cannot save subscription ID');
+      return;
+    }
 
     try {
-      console.log('📦 Saving subscriptionId to backend:', subscriptionId);
-      const token = localStorage.getItem('user_token');
+      console.log('📦 Starting to save subscriptionId to backend...');
+      console.log('👤 Current user ID:', currentUser.id);
+      console.log('🔑 Subscription ID:', subscriptionId);
+      console.log('🌐 Backend URL:', config.getBackendUrl());
+      
+      const requestBody = { playerId: subscriptionId, userId: currentUser.id };
+      console.log('📤 Request body:', requestBody);
+      
       const response = await apiCall(`${config.getBackendUrl()}/api/save-onesignal-id`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: subscriptionId, userId: currentUser.id })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
       if (response.ok) {
+        const responseData = await response.json();
         console.log('✅ Subscription ID saved successfully to backend');
+        console.log('📋 Response data:', responseData);
+        setNotifEnabled(true);
       } else {
+        const errorData = await response.text();
         console.error('❌ Failed to save Subscription ID:', response.status);
+        console.error('❌ Error response:', errorData);
+        setNotifEnabled(false);
       }
     } catch (error) {
       console.error('❌ Error saving Subscription ID:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      setNotifEnabled(false);
     }
   };
 
@@ -1274,6 +1318,56 @@ export default function ChatPage() {
     }
   };
 
+  const testSubscriptionIdSaving = async () => {
+    if (!currentUser?.id) {
+      console.error('❌ No current user found');
+      return;
+    }
+    
+    console.log('🧪 Testing subscription ID saving...');
+    console.log('👤 Current user:', currentUser);
+    
+    // Test with a dummy subscription ID first
+    const testSubscriptionId = 'test-subscription-id-' + Date.now();
+    console.log('🧪 Using test subscription ID:', testSubscriptionId);
+    
+    try {
+      await saveSubscriptionId(testSubscriptionId);
+      console.log('✅ Test subscription ID saved successfully');
+    } catch (error) {
+      console.error('❌ Test subscription ID saving failed:', error);
+    }
+  };
+
+  const debugSubscriptionProcess = async () => {
+    console.log('🔍 Starting subscription process debug...');
+    console.log('👤 Current user:', currentUser);
+    console.log('🔔 Notification permission:', Notification.permission);
+    console.log('📱 OneSignal available:', !!OneSignal);
+    
+    if (OneSignal) {
+      try {
+        const isSupported = await OneSignal.Notifications.isPushSupported();
+        console.log('📱 Push supported:', isSupported);
+        
+        if (isSupported) {
+          const playerId = await OneSignal.User.PushSubscription.id;
+          console.log('🎯 Current OneSignal Player ID:', playerId);
+        }
+      } catch (error) {
+        console.error('❌ OneSignal debug error:', error);
+      }
+    }
+    
+    // Test IndexedDB
+    try {
+      const subscriptionId = await getSubscriptionIdFromIndexedDB();
+      console.log('🗄️ IndexedDB subscription ID:', subscriptionId);
+    } catch (error) {
+      console.log('🗄️ IndexedDB error:', error);
+    }
+  };
+
 
   return (
     <div className="flex h-screen bg-gray-50 relative overflow-hidden">
@@ -1452,6 +1546,14 @@ export default function ChatPage() {
                         <DropdownMenuItem onClick={checkNotificationStatus}>
                           <Bell className="mr-2 h-4 w-4" />
                           Check Notification Status
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testSubscriptionIdSaving}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Test Subscription ID Saving
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={debugSubscriptionProcess}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Debug Subscription Process
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">

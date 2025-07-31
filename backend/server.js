@@ -170,35 +170,89 @@ async function sendCallNotification(receiverId, callerId, callType, roomId) {
 // Save OneSignal player ID for user
 app.post('/api/save-onesignal-id', async (req, res) => {
   try {
+    console.log('🔔 save-onesignal-id endpoint called');
+    console.log('📦 Request body:', req.body);
+    console.log('🔑 Request headers:', req.headers);
+    
     const { userId, playerId } = req.body;
-    console.log('Received save-onesignal-id request:', { userId, playerId });
+    console.log('📋 Extracted data:', { userId, playerId });
 
     if (!userId || !playerId) {
-      console.error('Missing userId or playerId:', { userId, playerId });
+      console.error('❌ Missing userId or playerId:', { userId, playerId });
       return res.status(400).json({ error: 'Missing userId or playerId' });
     }
 
+    // Validate playerId format (OneSignal player IDs are typically UUIDs)
+    if (typeof playerId !== 'string' || playerId.length < 10) {
+      console.error('❌ Invalid playerId format:', playerId);
+      return res.status(400).json({ error: 'Invalid playerId format' });
+    }
+
+    console.log('🔍 Checking if user exists:', userId);
+    
     // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
-      console.error('User not found:', userId);
+      console.error('❌ User not found:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
+    console.log('✅ User found:', { 
+      userId: user._id, 
+      username: user.username, 
+      currentPlayerId: user.oneSignalPlayerId 
+    });
+
+    // Check if playerId is already the same
+    if (user.oneSignalPlayerId === playerId) {
+      console.log('ℹ️ PlayerId already exists and is the same');
+      return res.json({ 
+        success: true, 
+        message: 'PlayerId already exists and is the same',
+        playerId: user.oneSignalPlayerId
+      });
+    }
+
+    console.log('💾 Updating user with new playerId...');
+    
     // Update user with playerId
-    const result = await User.updateOne({ _id: userId }, { $set: { oneSignalPlayerId: playerId } });
-    console.log('Update result:', result);
+    const result = await User.updateOne(
+      { _id: userId }, 
+      { $set: { oneSignalPlayerId: playerId } }
+    );
+    
+    console.log('📊 Update result:', result);
 
     if (result.modifiedCount > 0) {
-      console.log('PlayerId saved successfully for user:', userId);
-      res.json({ success: true, message: 'PlayerId saved successfully' });
+      console.log('✅ PlayerId saved successfully for user:', userId);
+      
+      // Verify the update by fetching the user again
+      const updatedUser = await User.findById(userId);
+      console.log('🔍 Verification - Updated user playerId:', updatedUser.oneSignalPlayerId);
+      
+      res.json({ 
+        success: true, 
+        message: 'PlayerId saved successfully',
+        playerId: updatedUser.oneSignalPlayerId,
+        modifiedCount: result.modifiedCount
+      });
     } else {
-      console.log('No changes made for user:', userId);
-      res.json({ success: true, message: 'PlayerId already exists' });
+      console.log('⚠️ No changes made for user:', userId);
+      res.json({ 
+        success: true, 
+        message: 'No changes made (playerId might already exist)',
+        playerId: user.oneSignalPlayerId,
+        modifiedCount: result.modifiedCount
+      });
     }
   } catch (error) {
-    console.error('Error saving playerId:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
+    console.error('❌ Error saving playerId:', error);
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message,
+      stack: error.stack
+    });
   }
 });
 
