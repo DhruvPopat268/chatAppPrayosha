@@ -230,6 +230,25 @@ export default function ChatPage() {
 
   const getAndSaveSubscriptionId = async () => {
     try {
+      // First try to get from OneSignal directly
+      if (OneSignal) {
+        try {
+          const isSubscribed = await OneSignal.Notifications.isPushSupported();
+          if (isSubscribed) {
+            const playerId = await OneSignal.User.PushSubscription.id;
+            if (playerId) {
+              console.log('✅ Got Player ID from OneSignal:', playerId);
+              await saveSubscriptionId(playerId);
+              setNotifEnabled(true);
+              return;
+            }
+          }
+        } catch (oneSignalError) {
+          console.log('OneSignal direct method failed, trying IndexedDB...');
+        }
+      }
+      
+      // Fallback to IndexedDB method
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
       console.log('✅ Got Subscription ID from IndexedDB:', subscriptionId);
       await saveSubscriptionId(subscriptionId);
@@ -275,16 +294,36 @@ export default function ChatPage() {
         }
   
         console.log('🚀 Initializing OneSignal...');
+        
+        // Check if OneSignal is already initialized
+        try {
+          const isInitialized = await OneSignal.Notifications.isPushSupported();
+          if (isInitialized) {
+            console.log('✅ OneSignal already initialized');
+            await getAndSaveSubscriptionId();
+            return;
+          }
+        } catch (e) {
+          console.log('OneSignal not yet initialized, proceeding with init...');
+        }
+        
         await OneSignal.init({
           appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
           allowLocalhostAsSecureOrigin: true,
           serviceWorkerPath: '/OneSignalSDKWorker.js',
-          serviceWorkerParam: { scope: '/' }
+          serviceWorkerParam: { scope: '/' },
+          notifyButton: {
+            enable: false, // Disable the default notification button
+          },
+          welcomeNotification: {
+            disable: true, // Disable welcome notification
+          }
         });
   
         console.log('✅ OneSignal initialized');
   
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait for OneSignal to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 2000));
   
         if ('Notification' in window) {
           const permission = Notification.permission;
@@ -293,16 +332,24 @@ export default function ChatPage() {
           if (permission === 'granted') {
             await getAndSaveSubscriptionId();
           } else if (permission === 'default') {
-            const result = await Notification.requestPermission();
-            console.log('🔔 Permission result:', result);
-            if (result === 'granted') {
-              await new Promise(resolve => setTimeout(resolve, 5000));
+            // Request permission using OneSignal's method
+            try {
+              await OneSignal.Notifications.requestPermission();
+              await new Promise(resolve => setTimeout(resolve, 3000));
               await getAndSaveSubscriptionId();
+            } catch (permissionError) {
+              console.log('OneSignal permission request failed, trying browser API...');
+              const result = await Notification.requestPermission();
+              console.log('🔔 Permission result:', result);
+              if (result === 'granted') {
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await getAndSaveSubscriptionId();
+              }
             }
           }
         }
   
-        // Optional: event listener
+        // Set up event listeners
         try {
           OneSignal.Notifications.addEventListener('permissionChange', async (permission: string) => {
             console.log('🔄 Permission changed:', permission);
@@ -329,9 +376,6 @@ export default function ChatPage() {
               
               // Navigate to chat page
               window.location.href = '/chat';
-              
-              // Optionally, you could store the call data and show a call back option
-              // For now, just redirect to chat
             }
           });
         } catch (error) {
@@ -1156,6 +1200,43 @@ export default function ChatPage() {
     }
   };
 
+  const testNotification = async () => {
+    if (!currentUser?.id) return;
+    try {
+      console.log('Testing notification...');
+      const response = await apiCall(`${config.getBackendUrl()}/api/debug/test-notification/${currentUser.id}`);
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Test notification result:', result);
+        alert('Test notification sent! Check your browser notifications.');
+      } else {
+        console.error('Test notification failed:', response.status);
+      }
+    } catch (error) {
+      console.error('Error testing notification:', error);
+    }
+  };
+
+  const checkNotificationStatus = async () => {
+    if (!currentUser?.id) return;
+    try {
+      console.log('Checking notification status...');
+      const response = await apiCall(`${config.getBackendUrl()}/api/debug/onesignal-config`);
+      if (response.ok) {
+        const config = await response.json();
+        console.log('OneSignal config:', config);
+        
+        const userResponse = await apiCall(`${config.getBackendUrl()}/api/debug/validate-onesignal-user/${currentUser.id}`);
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          console.log('User OneSignal data:', userData);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking notification status:', error);
+    }
+  };
+
 
   return (
     <div className="flex h-screen bg-gray-50 relative overflow-hidden">
@@ -1323,30 +1404,23 @@ export default function ChatPage() {
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
-                        {/* <DropdownMenuItem onClick={enableNotifications}>
+                        <DropdownMenuItem onClick={enableNotifications}>
                           <Bell className="mr-2 h-4 w-4" />
                           {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={getAndSaveSubscriptionId}>
+                        <DropdownMenuItem onClick={testNotification}>
                           <Bell className="mr-2 h-4 w-4" />
-                          Test Get PlayerId
+                          Test Notification
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={forceOneSignalSubscription}>
+                        <DropdownMenuItem onClick={checkNotificationStatus}>
                           <Bell className="mr-2 h-4 w-4" />
-                          Force OneSignal Subscription
+                          Check Notification Status
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testPlayerIdRetrieval}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Test PlayerId Retrieval
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={manuallySetPlayerId}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Manually Set PlayerId
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator /> */}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
-                          Logout             </DropdownMenuItem>
+                          Logout
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

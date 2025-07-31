@@ -443,14 +443,19 @@ io.on('connection', (socket) => {
             const notificationResponse = await axios.post('https://onesignal.com/api/v1/notifications', {
               app_id: process.env.ONESIGNAL_APP_ID,
               include_player_ids: [playerId],
-              headings: { en: populatedMessage.senderId.username + ' sent a message' },
-              contents: { en: content },
+              headings: { en: `${populatedMessage.senderId.username} sent a message` },
+              contents: { en: content.length > 100 ? content.substring(0, 100) + '...' : content },
               url: '/chat',
               data: {
                 messageId: message._id.toString(),
                 senderId: socket.userId,
-                type: type || 'text'
-              }
+                type: type || 'text',
+                senderName: populatedMessage.senderId.username
+              },
+              // Add notification styling
+              chrome_web_icon: '/placeholder-logo.png',
+              priority: 5, // Medium priority for messages
+              sound: 'default'
             }, {
               headers: {
                 'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`,
@@ -652,7 +657,15 @@ app.post('/api/debug/test-notification/:userId', async (req, res) => {
       include_player_ids: [user.oneSignalPlayerId],
       headings: { en: 'Test Notification' },
       contents: { en: 'This is a test notification from debug endpoint' },
-      url: '/chat'
+      url: '/chat',
+      data: {
+        type: 'test',
+        messageId: 'test-' + Date.now()
+      },
+      // Add notification styling
+      chrome_web_icon: '/placeholder-logo.png',
+      priority: 5,
+      sound: 'default'
     }, {
       headers: {
         'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`,
