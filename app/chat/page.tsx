@@ -179,6 +179,9 @@ export default function ChatPage() {
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [permissionRequested, setPermissionRequested] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<'default' | 'granted' | 'denied'>('default');
 
   // All refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -279,6 +282,27 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error('❌ Error saving Subscription ID:', error);
+    }
+  };
+
+  // Add this function after saveSubscriptionId
+  const requestNotificationPermission = async () => {
+    if (!currentUser?.id) return;
+    setPermissionRequested(true);
+    try {
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        setPermissionStatus(permission);
+        if (permission === 'granted') {
+          setShowPermissionPrompt(false);
+          await getAndSaveSubscriptionId();
+        } else {
+          setShowPermissionPrompt(false);
+        }
+      }
+    } catch (e) {
+      setShowPermissionPrompt(false);
+      setPermissionStatus('denied');
     }
   };
 
@@ -389,6 +413,19 @@ export default function ChatPage() {
   
     initializeOneSignal();
   }, [currentUser?.id]);
+  
+  // Add this useEffect after your OneSignal/init useEffect
+  useEffect(() => {
+    if (typeof window !== 'undefined' && currentUser?.id) {
+      if ('Notification' in window) {
+        const permission = Notification.permission;
+        setPermissionStatus(permission);
+        if (permission === 'default' && !permissionRequested) {
+          setShowPermissionPrompt(true);
+        }
+      }
+    }
+  }, [currentUser, permissionRequested]);
   
   // App initialization useEffect
   useEffect(() => {
@@ -2218,6 +2255,18 @@ export default function ChatPage() {
         playsInline
         style={{ display: 'none' }}
       />
+
+      {showPermissionPrompt && permissionStatus === 'default' && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#fffbe6', padding: 16, textAlign: 'center', borderBottom: '1px solid #ffe58f' }}>
+          <span>Enable notifications to receive new message alerts!</span>
+          <button
+            style={{ marginLeft: 16, padding: '4px 12px', background: '#ffd666', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+            onClick={requestNotificationPermission}
+          >
+            Allow Notifications
+          </button>
+        </div>
+      )}
 
     </div>
   )
