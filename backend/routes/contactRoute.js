@@ -1,29 +1,10 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const Contact = require("../models/contactModel");
 const User = require("../models/authModel");
 const router = express.Router();
 
-// Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: "Access token required" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: "Invalid token" });
-    }
-    req.user = user;
-    next();
-  });
-};
-
 // Get all contacts for a user
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const contacts = await Contact.find({ userId: req.user.userId })
       .populate('contactId', 'username email _id')
@@ -64,7 +45,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Add a contact
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
   const { contactId } = req.body;
   
   if (!contactId) {
@@ -135,7 +116,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Remove a contact
-router.delete('/:contactId', authenticateToken, async (req, res) => {
+router.delete('/:contactId', async (req, res) => {
   const { contactId } = req.params;
 
   try {
@@ -155,7 +136,7 @@ router.delete('/:contactId', authenticateToken, async (req, res) => {
 });
 
 // Cleanup orphaned contacts (contacts that reference deleted users)
-router.post('/cleanup', authenticateToken, async (req, res) => {
+router.post('/cleanup', async (req, res) => {
   try {
     // Find all contacts for the current user
     const userContacts = await Contact.find({ userId: req.user.userId });
@@ -191,7 +172,7 @@ router.post('/cleanup', authenticateToken, async (req, res) => {
 });
 
 // Debug endpoint to check contact status
-router.get('/debug', authenticateToken, async (req, res) => {
+router.get('/debug', async (req, res) => {
   try {
     const contacts = await Contact.find({ userId: req.user.userId })
       .populate('contactId', 'username email _id')

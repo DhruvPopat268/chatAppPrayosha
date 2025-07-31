@@ -705,7 +705,7 @@ class WebRTCManager {
     
     // Fallback: try to get from sessionStorage or other sources
     try {
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('user_token') // Updated to use new key
       if (token) {
         // Extract user ID from JWT token if possible
         const payload = JSON.parse(atob(token.split('.')[1]))

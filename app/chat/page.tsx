@@ -391,6 +391,7 @@ export default function ChatPage() {
             // Load messages for the first contact
             loadMessages(firstContact.id)
           }
+          
         } else {
           console.error('Failed to load contacts')
         }

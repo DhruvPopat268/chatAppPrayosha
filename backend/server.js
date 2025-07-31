@@ -13,6 +13,8 @@ const contactRoutes = require("./routes/contactRoute");
 const messageRoutes = require("./routes/messageRoute");
 const adminAuthRoutes = require("./routes/adminAuthRoute");
 const User = require('./models/authModel');
+const Session = require('./models/sessionModel');
+const { cleanupExpiredSessions } = require('./utils/sessionUtils');
 
 const app = express();
 const server = http.createServer(app);
@@ -40,9 +42,11 @@ const io = socketIo(server, {
 
 app.use(express.json());
 
+const authMiddleware = require('./middleware/authMiddleware');
+
 app.use("/api/auth", authRoutes);
-app.use("/api/contacts", contactRoutes);
-app.use("/api/messages", messageRoutes);
+app.use("/api/contacts", authMiddleware, contactRoutes);
+app.use("/api/messages", authMiddleware, messageRoutes);
 app.use("/api/admin-auth", adminAuthRoutes);
 
 
@@ -707,6 +711,10 @@ mongoose.connect(process.env.MONGO_URI)
       console.log(`🚀 Server running on http://localhost:${process.env.PORT}`);
       console.log(`🔌 Socket.IO server ready`);
     });
+    
+    // Set up session cleanup job (run every 6 hours)
+    setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
+    console.log("🧹 Session cleanup job scheduled");
   })
   .catch(err => {
     console.error("❌ MongoDB connection error:", err);

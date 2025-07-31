@@ -66,7 +66,10 @@ class SocketManager {
     this.socket.on('auth_error', (error) => {
       console.error('Socket authentication failed:', error)
       this.disconnect()
-      alert('Authentication failed. Please log in again.')
+      // Import and use handleAuthError
+      import('./clientAuth').then(({ handleAuthError }) => {
+        handleAuthError()
+      })
     })
 
     return this.socket

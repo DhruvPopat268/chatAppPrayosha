@@ -1,30 +1,11 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const Message = require("../models/messageModel");
 const User = require("../models/authModel");
 const router = express.Router();
 const mongoose = require('mongoose');
 
-// Middleware to verify JWT token
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: "Access token required" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: "Invalid token" });
-    }
-    req.user = user;
-    next();
-  });
-};
-
 // Get messages between two users
-router.get('/:receiverId', authenticateToken, async (req, res) => {
+router.get('/:receiverId', async (req, res) => {
   try {
     const { receiverId } = req.params;
     const { page = 1, limit = 50 } = req.query;
@@ -60,7 +41,7 @@ router.get('/:receiverId', authenticateToken, async (req, res) => {
 });
 
 // Send a message
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { receiverId, content, type = 'text', fileName, fileSize } = req.body;
 
@@ -89,7 +70,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Mark messages as read
-router.put('/read/:senderId', authenticateToken, async (req, res) => {
+router.put('/read/:senderId', async (req, res) => {
   try {
     const { senderId } = req.params;
 
@@ -110,7 +91,7 @@ router.put('/read/:senderId', authenticateToken, async (req, res) => {
 });
 
 // Get unread message count
-router.get('/unread/count', authenticateToken, async (req, res) => {
+router.get('/unread/count', async (req, res) => {
   try {
     const unreadCounts = await Message.aggregate([
       {
@@ -135,7 +116,7 @@ router.get('/unread/count', authenticateToken, async (req, res) => {
 });
 
 // Delete all messages between current user and receiver
-router.delete('/:receiverId', authenticateToken, async (req, res) => {
+router.delete('/:receiverId', async (req, res) => {
   try {
     const { receiverId } = req.params;
     // Delete messages where current user is sender or receiver and receiverId is the other party

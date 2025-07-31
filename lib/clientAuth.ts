@@ -12,27 +12,28 @@ interface User {
 interface LoginResponse {
   token: string
   user: User
+  sessionId: string
 }
 
-// Get token from localStorage
+// Get token from localStorage with new key name
 export const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('token')
+    return localStorage.getItem('user_token')
   }
   return null
 }
 
-// Set token in localStorage
+// Set token in localStorage with new key name
 export const setToken = (token: string): void => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('token', token)
+    localStorage.setItem('user_token', token)
   }
 }
 
 // Remove token from localStorage
 export const removeToken = (): void => {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('token')
+    localStorage.removeItem('user_token')
   }
 }
 
@@ -81,7 +82,7 @@ export const signup = async (username: string, email: string): Promise<void> => 
   }
 }
 
-// Login function (username only)
+// Updated login function with session management
 export const login = async (username: string): Promise<LoginResponse> => {
   const response = await fetch(`${config.getBackendUrl()}/api/auth/login`, {
     method: 'POST',
@@ -90,17 +91,27 @@ export const login = async (username: string): Promise<LoginResponse> => {
     },
     body: JSON.stringify({ username }),
   })
+  
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Login failed')
   }
+  
   const data = await response.json()
+  
+  // Store token with new key name
   setToken(data.token)
   setCurrentUser(data.user)
+  
+  // Also store session ID for reference
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('sessionId', data.sessionId)
+  }
+  
   return data
 }
 
-// Logout function
+// Updated logout function
 export const logout = async (): Promise<void> => {
   try {
     await fetch(`${config.getBackendUrl()}/api/auth/logout`, {
@@ -114,10 +125,14 @@ export const logout = async (): Promise<void> => {
   } finally {
     removeToken()
     removeCurrentUser()
+    // Remove session ID
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sessionId')
+    }
   }
 }
 
-// API call with authentication
+// API call with authentication using new token key
 export const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const token = getToken()
   
@@ -134,4 +149,21 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     ...options,
     headers,
   })
+}
+
+// Check if user is authenticated
+export const isAuthenticated = (): boolean => {
+  const token = getToken()
+  const user = getCurrentUser()
+  return !!(token && user)
+}
+
+// Handle authentication errors and redirect to login
+export const handleAuthError = (): void => {
+  removeToken()
+  removeCurrentUser()
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('sessionId')
+    window.location.href = '/login'
+  }
 } 
