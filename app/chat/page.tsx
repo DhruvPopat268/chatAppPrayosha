@@ -207,26 +207,65 @@ export default function ChatPage() {
   // Helper to get Subscription ID from IndexedDB
   function getSubscriptionIdFromIndexedDB() {
     return new Promise<string>((resolve, reject) => {
+      console.log('🗄️ Attempting to access OneSignal IndexedDB...');
+      
       const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
 
-      request.onerror = () => reject('❌ Failed to open IndexedDB');
+      request.onerror = () => {
+        console.error('❌ Failed to open OneSignal IndexedDB:', request.error);
+        reject('❌ Failed to open IndexedDB: ' + request.error?.message);
+      };
 
       request.onsuccess = () => {
         const db = request.result;
-        const transaction = db.transaction(['subscriptions'], 'readonly');
-        const store = transaction.objectStore('subscriptions');
-        const getAllRequest = store.getAll();
+        console.log('✅ OneSignal IndexedDB opened successfully');
+        console.log('📊 Database object stores:', db.objectStoreNames);
+        
+        // Check if the subscriptions object store exists
+        if (!db.objectStoreNames.contains('subscriptions')) {
+          console.error('❌ Subscriptions object store not found in IndexedDB');
+          console.log('📋 Available object stores:', Array.from(db.objectStoreNames));
+          reject('❌ Subscriptions object store not found. Available stores: ' + Array.from(db.objectStoreNames).join(', '));
+          return;
+        }
 
-        getAllRequest.onsuccess = () => {
-          const subs = getAllRequest.result;
-          if (subs && subs.length > 0 && subs[0].id) {
-            resolve(subs[0].id); // ✅ Subscription ID (aka Player ID)
-          } else {
-            reject('❌ No subscription ID found in IndexedDB');
-          }
-        };
+        try {
+          const transaction = db.transaction(['subscriptions'], 'readonly');
+          const store = transaction.objectStore('subscriptions');
+          const getAllRequest = store.getAll();
 
-        getAllRequest.onerror = () => reject('❌ Failed to read subscriptions');
+          getAllRequest.onsuccess = () => {
+            const subs = getAllRequest.result;
+            console.log('📦 Retrieved subscriptions from IndexedDB:', subs);
+            
+            if (subs && subs.length > 0 && subs[0].id) {
+              console.log('✅ Found subscription ID:', subs[0].id);
+              resolve(subs[0].id); // ✅ Subscription ID (aka Player ID)
+            } else {
+              console.log('⚠️ No valid subscription found in IndexedDB');
+              reject('❌ No subscription ID found in IndexedDB');
+            }
+          };
+
+          getAllRequest.onerror = () => {
+            console.error('❌ Failed to read subscriptions from IndexedDB:', getAllRequest.error);
+            reject('❌ Failed to read subscriptions: ' + getAllRequest.error?.message);
+          };
+        } catch (error) {
+          console.error('❌ Error accessing subscriptions object store:', error);
+          reject('❌ Error accessing subscriptions: ' + (error instanceof Error ? error.message : String(error)));
+        }
+      };
+
+      request.onupgradeneeded = (event) => {
+        console.log('🔄 IndexedDB upgrade needed');
+        const db = (event.target as IDBOpenDBRequest).result;
+        
+        // Check if subscriptions store exists, if not create it
+        if (!db.objectStoreNames.contains('subscriptions')) {
+          console.log('📝 Creating subscriptions object store...');
+          db.createObjectStore('subscriptions', { keyPath: 'id' });
+        }
       };
     });
   }
@@ -356,105 +395,28 @@ export default function ChatPage() {
   
     const initializeOneSignal = async () => {
       try {
-        if (!OneSignal) {
-          const module = await import('react-onesignal');
-          OneSignal = module.default;
-        }
-  
-        console.log('🚀 Initializing OneSignal...');
+        console.log('🚀 Starting OneSignal initialization for user:', currentUser.id);
         
-        // Check if OneSignal is already initialized
-        try {
-          const isInitialized = await OneSignal.Notifications.isPushSupported();
-          if (isInitialized) {
-            console.log('✅ OneSignal already initialized');
-            await getAndSaveSubscriptionId();
-            return;
-          }
-        } catch (e) {
-          console.log('OneSignal not yet initialized, proceeding with init...');
-        }
+        // Use the proper initialization function
+        const playerId = await initializeOneSignalProperly();
         
-        await OneSignal.init({
-          appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerPath: '/OneSignalSDKWorker.js',
-          serviceWorkerParam: { scope: '/' },
-          notifyButton: {
-            enable: false, // Disable the default notification button
-          },
-          welcomeNotification: {
-            disable: true, // Disable welcome notification
-          }
-        });
-  
-        console.log('✅ OneSignal initialized');
-  
-        // Wait for OneSignal to fully initialize
-        await new Promise(resolve => setTimeout(resolve, 2000));
-  
-        if ('Notification' in window) {
-          const permission = Notification.permission;
-          console.log('🔔 Notification permission:', permission);
-  
-          if (permission === 'granted') {
+        if (playerId) {
+          console.log('✅ OneSignal initialized with Player ID, saving to backend...');
+          await saveSubscriptionId(playerId);
+        } else {
+          console.log('⚠️ OneSignal initialized but no Player ID available, trying IndexedDB...');
+          // Try to get from IndexedDB as fallback
+          try {
             await getAndSaveSubscriptionId();
-          } else if (permission === 'default') {
-            // Request permission using OneSignal's method
-            try {
-              await OneSignal.Notifications.requestPermission();
-              await new Promise(resolve => setTimeout(resolve, 3000));
-              await getAndSaveSubscriptionId();
-            } catch (permissionError) {
-              console.log('OneSignal permission request failed, trying browser API...');
-              const result = await Notification.requestPermission();
-              console.log('🔔 Permission result:', result);
-              if (result === 'granted') {
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                await getAndSaveSubscriptionId();
-              }
-            }
+          } catch (indexedDBError) {
+            console.log('❌ IndexedDB fallback also failed:', indexedDBError);
           }
         }
-  
-        // Set up event listeners
-        try {
-          OneSignal.Notifications.addEventListener('permissionChange', async (permission: string) => {
-            console.log('🔄 Permission changed:', permission);
-            if (permission === 'granted') {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              await getAndSaveSubscriptionId();
-            } else {
-              setNotifEnabled(false);
-            }
-          });
-        } catch (error) {
-          console.log('⚠️ Could not set permissionChange listener');
-        }
-
-        // Handle notification clicks
-        try {
-          OneSignal.Notifications.addEventListener('click', (event: any) => {
-            console.log('🔔 Notification clicked:', event);
-            
-            // Handle call notifications
-            if (event.notification.data?.type === 'call') {
-              const callData = event.notification.data;
-              console.log('📞 Call notification clicked:', callData);
-              
-              // Navigate to chat page
-              window.location.href = '/chat';
-            }
-          });
-        } catch (error) {
-          console.log('⚠️ Could not set notification click listener');
-        }
-  
       } catch (error) {
-        console.error('❌ OneSignal init error:', error);
+        console.error('❌ OneSignal initialization failed:', error);
       }
     };
-  
+
     initializeOneSignal();
   }, [currentUser?.id]);
   
@@ -1368,6 +1330,110 @@ export default function ChatPage() {
     }
   };
 
+  const initializeOneSignalProperly = async () => {
+    console.log('🚀 Starting proper OneSignal initialization...');
+    
+    try {
+      if (!OneSignal) {
+        console.log('📦 Loading OneSignal module...');
+        const module = await import('react-onesignal');
+        OneSignal = module.default;
+      }
+
+      console.log('🔧 Initializing OneSignal with proper configuration...');
+      
+      await OneSignal.init({
+        appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath: '/OneSignalSDKWorker.js',
+        serviceWorkerParam: { scope: '/' },
+        notifyButton: {
+          enable: false,
+        },
+        welcomeNotification: {
+          disable: true,
+        },
+        // Add these options to ensure proper setup
+        autoRegister: true,
+        autoResubscribe: true,
+        persistNotification: false
+      });
+
+      console.log('✅ OneSignal initialized successfully');
+      
+      // Wait for OneSignal to fully set up
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Check if push is supported
+      const isSupported = await OneSignal.Notifications.isPushSupported();
+      console.log('📱 Push notifications supported:', isSupported);
+      
+      if (isSupported) {
+        // Request permission if not already granted
+        const permission = await OneSignal.Notifications.permission;
+        console.log('🔔 Current permission:', permission);
+        
+        if (permission === 'default') {
+          console.log('🔔 Requesting notification permission...');
+          await OneSignal.Notifications.requestPermission();
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        // Get the player ID
+        const playerId = await OneSignal.User.PushSubscription.id;
+        console.log('🎯 OneSignal Player ID:', playerId);
+        
+        if (playerId) {
+          console.log('✅ OneSignal properly initialized with Player ID');
+          return playerId;
+        } else {
+          console.log('⚠️ OneSignal initialized but no Player ID yet');
+        }
+      } else {
+        console.log('⚠️ Push notifications not supported');
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ OneSignal initialization failed:', error);
+      return null;
+    }
+  };
+
+  const clearOneSignalIndexedDB = async () => {
+    console.log('🧹 Clearing OneSignal IndexedDB...');
+    
+    try {
+      // Close any existing connections
+      const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
+      
+      request.onsuccess = () => {
+        const db = request.result;
+        db.close();
+        
+        // Delete the database
+        const deleteRequest = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
+        
+        deleteRequest.onsuccess = () => {
+          console.log('✅ OneSignal IndexedDB deleted successfully');
+          alert('OneSignal IndexedDB cleared. Please refresh the page to reinitialize.');
+        };
+        
+        deleteRequest.onerror = () => {
+          console.error('❌ Failed to delete OneSignal IndexedDB:', deleteRequest.error);
+          alert('Failed to clear OneSignal IndexedDB');
+        };
+      };
+      
+      request.onerror = () => {
+        console.error('❌ Failed to open OneSignal IndexedDB for deletion:', request.error);
+        alert('Failed to access OneSignal IndexedDB');
+      };
+    } catch (error) {
+      console.error('❌ Error clearing OneSignal IndexedDB:', error);
+      alert('Error clearing OneSignal IndexedDB');
+    }
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 relative overflow-hidden">
@@ -1554,6 +1620,10 @@ export default function ChatPage() {
                         <DropdownMenuItem onClick={debugSubscriptionProcess}>
                           <Bug className="mr-2 h-4 w-4" />
                           Debug Subscription Process
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={clearOneSignalIndexedDB}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Clear OneSignal IndexedDB
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
