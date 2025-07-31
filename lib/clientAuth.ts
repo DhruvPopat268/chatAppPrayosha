@@ -145,10 +145,19 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   })
+
+  // Handle 401 Unauthorized - redirect to login and clear storage
+  if (response.status === 401) {
+    console.log('Authentication failed (401), redirecting to login...')
+    handleAuthError()
+    throw new Error('Authentication failed. Please login again.')
+  }
+
+  return response
 }
 
 // Check if user is authenticated
@@ -165,5 +174,58 @@ export const handleAuthError = (): void => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('sessionId')
     window.location.href = '/login'
+  }
+}
+
+// Enhanced API call with automatic error handling
+export const apiCall = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  try {
+    const response = await authenticatedFetch(url, options)
+    
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+      console.log('Authentication failed (401), redirecting to login...')
+      handleAuthError()
+      throw new Error('Authentication failed. Please login again.')
+    }
+    
+    return response
+  } catch (error) {
+    // If it's already a 401 error, don't handle it again
+    if (error instanceof Error && error.message.includes('Authentication failed')) {
+      throw error
+    }
+    
+    // For network errors or other issues, log and rethrow
+    console.error('API call error:', error)
+    throw error
+  }
+}
+
+// Utility function to check if user has active session
+export const checkSessionStatus = async (): Promise<boolean> => {
+  try {
+    const token = getToken()
+    if (!token) {
+      return false
+    }
+
+    const response = await fetch(`${config.getBackendUrl()}/api/auth/session-status`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (response.status === 401) {
+      handleAuthError()
+      return false
+    }
+
+    return response.ok
+  } catch (error) {
+    console.error('Session status check failed:', error)
+    return false
   }
 } 

@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { getCurrentUser, authenticatedFetch, logout } from "@/lib/clientAuth"
+import { getCurrentUser, authenticatedFetch, logout, apiCall, checkSessionStatus, handleAuthError } from "@/lib/clientAuth"
 import socketManager from "@/lib/socket"
 import config from "@/lib/config"
 import WebRTCManager from "@/lib/webrtc"
@@ -246,10 +246,11 @@ export default function ChatPage() {
 
     try {
       console.log('📦 Saving subscriptionId to backend:', subscriptionId);
-      const response = await fetch(`${config.getBackendUrl()}/api/save-onesignal-id`, {
+      const token = localStorage.getItem('user_token');
+      const response = await apiCall(`${config.getBackendUrl()}/api/save-onesignal-id`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: subscriptionId, userId: currentUser.id }) // keep playerId if backend expects it
+        body: JSON.stringify({ playerId: subscriptionId, userId: currentUser.id })
       });
 
       if (response.ok) {
@@ -354,6 +355,14 @@ export default function ChatPage() {
         return
       }
 
+      // Check if session is still valid
+      const isSessionValid = await checkSessionStatus()
+      if (!isSessionValid) {
+        console.log('Session invalid, redirecting to login...')
+        handleAuthError()
+        return
+      }
+
       const currentUserData: CurrentUser = {
         id: user.id,
         username: user.username || "Unknown User",
@@ -381,7 +390,7 @@ export default function ChatPage() {
 
       // Load contacts
       try {
-        const response = await authenticatedFetch(`${config.getBackendUrl()}/api/contacts`)
+        const response = await apiCall(`${config.getBackendUrl()}/api/contacts`)
         if (response.ok) {
           const contacts = await response.json()
           setUserContacts(contacts)
@@ -412,6 +421,21 @@ export default function ChatPage() {
       socketManager.disconnect()
     }
   }, [])
+
+  // Periodic session check
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const sessionCheckInterval = setInterval(async () => {
+      const isSessionValid = await checkSessionStatus();
+      if (!isSessionValid) {
+        console.log('Session expired during periodic check, redirecting to login...');
+        handleAuthError();
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => clearInterval(sessionCheckInterval);
+  }, [currentUser]);
 
   // Local audio stream useEffect
   useEffect(() => {
@@ -569,8 +593,19 @@ export default function ChatPage() {
     setIsSearching(true);
     const url = `${config.getBackendUrl()}/api/auth/search?q=${encodeURIComponent(friendSearchQuery)}`;
     console.log('Searching users with URL:', url);
-    fetch(url)
-      .then(res => {
+    
+    const token = localStorage.getItem('user_token');
+    fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(async res => {
+        if (res.status === 401) {
+          handleAuthError();
+          return [];
+        }
         if (!res.ok) {
           console.error('User search API error:', res.status, res.statusText);
           return [];
@@ -831,7 +866,7 @@ export default function ChatPage() {
 
   const addFriend = async (user: ApiUser) => {
     try {
-      const response = await authenticatedFetch(`${config.getBackendUrl()}/api/contacts`, {
+      const response = await apiCall(`${config.getBackendUrl()}/api/contacts`, {
         method: 'POST',
         body: JSON.stringify({ contactId: user._id }),
       })
@@ -867,7 +902,7 @@ export default function ChatPage() {
   const loadMessages = async (contactId: string) => {
     setIsLoadingMessages(true)
     try {
-      const response = await authenticatedFetch(`${config.getBackendUrl()}/api/messages/${contactId}`)
+      const response = await apiCall(`${config.getBackendUrl()}/api/messages/${contactId}`)
       if (response.ok) {
         const messagesData = await response.json()
         const formattedMessages: Message[] = messagesData.map((msg: any) => ({
@@ -896,8 +931,8 @@ export default function ChatPage() {
     if (!selectedContact || !currentUser) return;
     try {
       // Call backend API to delete all messages between current user and selected contact
-      const token = localStorage.getItem('token');
-      await fetch(`${config.getBackendUrl()}/api/messages/${selectedContact.id}`, {
+      const token = localStorage.getItem('user_token');
+      await apiCall(`${config.getBackendUrl()}/api/messages/${selectedContact.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

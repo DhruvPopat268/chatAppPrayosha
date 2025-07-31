@@ -197,10 +197,22 @@ export async function signOutAdmin(): Promise<void> {
 // User management functions
 export async function getAllUsers(): Promise<User[]> {
   try {
+    const token = localStorage.getItem('user_token');
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" }
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
     });
+    
+    if (response.status === 401) {
+      // Import and use handleAuthError from clientAuth
+      const { handleAuthError } = await import('./clientAuth');
+      handleAuthError();
+      return [];
+    }
+    
     if (!response.ok) {
       // Return mock data if API fails
       return users.map((u: any) => ({ ...u, id: u.id }));
@@ -218,14 +230,23 @@ export async function createUser(data: {
   username: string
 }): Promise<{ success?: boolean; error?: string }> {
   try {
+    const token = localStorage.getItem('user_token');
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/signup`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-admin": "true"
+        "x-admin": "true",
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({ username: data.username })
     });
+    
+    if (response.status === 401) {
+      const { handleAuthError } = await import('./clientAuth');
+      handleAuthError();
+      return { error: "Authentication failed" };
+    }
+    
     const result = await response.json();
     if (!response.ok) {
       return { error: result.error || "User creation failed" };
@@ -238,13 +259,22 @@ export async function createUser(data: {
 
 export async function deleteUser(userId: string): Promise<{ success?: boolean; error?: string }> {
   try {
+    const token = localStorage.getItem('user_token');
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/${userId}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        "x-admin": "true"
+        "x-admin": "true",
+        "Authorization": `Bearer ${token}`
       }
     });
+    
+    if (response.status === 401) {
+      const { handleAuthError } = await import('./clientAuth');
+      handleAuthError();
+      return { error: "Authentication failed" };
+    }
+    
     const result = await response.json();
     if (!response.ok) {
       return { error: result.error || "User deletion failed" };
