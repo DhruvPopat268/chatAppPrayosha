@@ -59,11 +59,75 @@ import { useRouter } from 'next/navigation';
 
 // Dynamic import for OneSignal to prevent SSR issues
 let OneSignal: any = null;
-if (typeof window !== 'undefined') {
-  import('react-onesignal').then((module) => {
+let OneSignalInitialized = false;
+
+// Initialize OneSignal with proper error handling
+const initializeOneSignal = async () => {
+  if (OneSignalInitialized) return OneSignal;
+  
+  try {
+    console.log('🔄 Starting OneSignal initialization...');
+    
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') {
+      console.log('⚠️ Not in browser environment, skipping OneSignal init');
+      return null;
+    }
+
+    // Check if OneSignal is already available globally
+    if (window.OneSignal) {
+      console.log('✅ OneSignal already available globally');
+      OneSignal = window.OneSignal;
+      OneSignalInitialized = true;
+      return OneSignal;
+    }
+
+    // Import OneSignal module
+    const module = await import('react-onesignal');
     OneSignal = module.default;
-  });
-}
+    
+    // Check environment configuration
+    const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+    if (!appId) {
+      console.error('❌ OneSignal App ID not configured');
+      return null;
+    }
+
+    console.log('🔧 Initializing OneSignal with App ID:', appId);
+    
+    // Initialize OneSignal with minimal configuration to avoid initialization issues
+    await OneSignal.init({
+      appId: appId,
+      allowLocalhostAsSecureOrigin: true,
+      serviceWorkerPath: '/OneSignalSDKWorker.js',
+      serviceWorkerParam: { scope: '/' },
+      // Disable features that might cause initialization issues
+      notifyButton: {
+        enable: false,
+      },
+      welcomeNotification: {
+        disable: true,
+      },
+      autoRegister: false,
+      autoResubscribe: false,
+      persistNotification: false,
+      // Add timeout to prevent hanging
+      timeout: 10000
+    });
+
+    console.log('✅ OneSignal initialized successfully');
+    OneSignalInitialized = true;
+    
+    // Wait a bit for OneSignal to fully set up
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    return OneSignal;
+  } catch (error) {
+    console.error('❌ OneSignal initialization failed:', error);
+    OneSignalInitialized = false;
+    return null;
+  }
+};
 
 interface Contact {
   id: string
@@ -185,6 +249,11 @@ export default function ChatPage() {
   const [permissionRequested, setPermissionRequested] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<'default' | 'granted' | 'denied'>('default');
 
+  // Add offline detection and connection status tracking
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSeen, setLastSeen] = useState<number | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+
   // All refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -205,10 +274,15 @@ export default function ChatPage() {
     }
   }, [router]);
 
-  // Helper to get Subscription ID from IndexedDB
+  // Helper to get Subscription ID from IndexedDB with better error handling
   function getSubscriptionIdFromIndexedDB() {
     return new Promise<string>((resolve, reject) => {
       console.log('🗄️ Attempting to access OneSignal IndexedDB...');
+      
+      if (typeof window === 'undefined' || !window.indexedDB) {
+        reject('❌ IndexedDB not available');
+        return;
+      }
       
       const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
 
@@ -271,21 +345,22 @@ export default function ChatPage() {
     });
   }
 
-
   const getAndSaveSubscriptionId = async () => {
     console.log('🚀 Starting getAndSaveSubscriptionId...');
     console.log('👤 Current user:', currentUser);
     
     try {
-      // First try to get from OneSignal directly
-      if (OneSignal) {
+      // Initialize OneSignal first
+      const oneSignalInstance = await initializeOneSignal();
+      
+      if (oneSignalInstance) {
         console.log('🔍 Trying OneSignal direct method...');
         try {
-          const isSubscribed = await OneSignal.Notifications.isPushSupported();
+          const isSubscribed = await oneSignalInstance.Notifications.isPushSupported();
           console.log('📱 Push supported:', isSubscribed);
           
           if (isSubscribed) {
-            const playerId = await OneSignal.User.PushSubscription.id;
+            const playerId = await oneSignalInstance.User.PushSubscription.id;
             console.log('🎯 Got Player ID from OneSignal:', playerId);
             
             if (playerId) {
@@ -321,7 +396,6 @@ export default function ChatPage() {
       setNotifEnabled(false);
     }
   };
-
 
   const saveSubscriptionId = async (subscriptionId: string) => {
     if (!currentUser?.id) {
@@ -394,37 +468,73 @@ export default function ChatPage() {
   useEffect(() => {
     if (!currentUser?.id) return;
   
-    const initializeOneSignal = async () => {
+    const initializeNotifications = async () => {
       try {
-        console.log('🚀 Starting OneSignal initialization for user:', currentUser.id);
+        console.log('🚀 Starting notification initialization for user:', currentUser.id);
         
-        // Check environment configuration first
-        if (!checkOneSignalEnvironment()) {
-          console.error('❌ OneSignal environment not properly configured');
+        // Check if we're in a browser environment
+        if (typeof window === 'undefined') {
+          console.log('⚠️ Not in browser environment, skipping notification setup');
           return;
         }
         
-        // Use the proper initialization function
-        const playerId = await initializeOneSignalProperly();
-        
-        if (playerId) {
-          console.log('✅ OneSignal initialized with Player ID, saving to backend...');
-          await saveSubscriptionId(playerId);
-        } else {
-          console.log('⚠️ OneSignal initialized but no Player ID available, trying IndexedDB...');
-          // Try to get from IndexedDB as fallback
-          try {
-            await getAndSaveSubscriptionId();
-          } catch (indexedDBError) {
-            console.log('❌ IndexedDB fallback also failed:', indexedDBError);
+        // Check notification permission first
+        if ('Notification' in window) {
+          const permission = Notification.permission;
+          console.log('🔔 Current notification permission:', permission);
+          
+          if (permission === 'default') {
+            console.log('🔔 Requesting notification permission...');
+            const newPermission = await Notification.requestPermission();
+            console.log('🔔 New permission status:', newPermission);
+            
+            if (newPermission !== 'granted') {
+              console.log('⚠️ Notification permission denied');
+              return;
+            }
+          } else if (permission === 'denied') {
+            console.log('⚠️ Notification permission denied');
+            return;
           }
         }
+        
+        // Initialize OneSignal
+        const oneSignalInstance = await initializeOneSignal();
+        
+        if (oneSignalInstance) {
+          console.log('✅ OneSignal initialized successfully');
+          
+          // Wait for OneSignal to be ready
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Try to get player ID
+          try {
+            const playerId = await oneSignalInstance.User.PushSubscription.id;
+            console.log('🎯 OneSignal Player ID:', playerId);
+            
+            if (playerId) {
+              console.log('✅ OneSignal ready with Player ID, saving to backend...');
+              await saveSubscriptionId(playerId);
+            } else {
+              console.log('⚠️ OneSignal ready but no Player ID yet, trying IndexedDB...');
+              await getAndSaveSubscriptionId();
+            }
+          } catch (idError) {
+            console.log('⚠️ Could not get Player ID from OneSignal, trying IndexedDB...');
+            await getAndSaveSubscriptionId();
+          }
+        } else {
+          console.log('⚠️ OneSignal initialization failed, trying IndexedDB only...');
+          await getAndSaveSubscriptionId();
+        }
       } catch (error) {
-        console.error('❌ OneSignal initialization failed:', error);
+        console.error('❌ Notification initialization failed:', error);
       }
     };
 
-    initializeOneSignal();
+    // Delay initialization to ensure everything is loaded
+    const timer = setTimeout(initializeNotifications, 2000);
+    return () => clearTimeout(timer);
   }, [currentUser?.id]);
   
   // Add this useEffect after your OneSignal/init useEffect
@@ -746,6 +856,91 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [currentUser?.id]);
 
+  // Track online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('🌐 User is online');
+      setIsOnline(true);
+      setConnectionStatus('connected');
+    };
+
+    const handleOffline = () => {
+      console.log('📴 User is offline');
+      setIsOnline(false);
+      setConnectionStatus('disconnected');
+      setLastSeen(Date.now());
+    };
+
+    // Listen for online/offline events
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Check initial status
+    setIsOnline(navigator.onLine);
+    setConnectionStatus(navigator.onLine ? 'connected' : 'disconnected');
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Track socket connection status
+  useEffect(() => {
+    const socket = socketManager.getSocket();
+    if (!socket) return;
+
+    const handleConnect = () => {
+      console.log('🔌 Socket connected');
+      setConnectionStatus('connected');
+    };
+
+    const handleDisconnect = () => {
+      console.log('🔌 Socket disconnected');
+      setConnectionStatus('disconnected');
+      setLastSeen(Date.now());
+    };
+
+    const handleConnecting = () => {
+      console.log('🔌 Socket connecting...');
+      setConnectionStatus('connecting');
+    };
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connecting', handleConnecting);
+
+    // Set initial status
+    setConnectionStatus(socket.connected ? 'connected' : 'disconnected');
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connecting', handleConnecting);
+    };
+  }, [socketManager]);
+
+  // Function to check if user should receive notifications (offline for more than 5 minutes)
+  const shouldSendOfflineNotification = (lastSeenTime: number) => {
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    return lastSeenTime < fiveMinutesAgo;
+  };
+
+  // Function to get user's offline status message
+  const getOfflineStatusMessage = (lastSeenTime: number) => {
+    const now = Date.now();
+    const diffInMinutes = Math.floor((now - lastSeenTime) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+  };
+
   // All other functions and logic below
   const handleTyping = () => {
     if (!selectedContact || !currentUser) return;
@@ -759,37 +954,42 @@ export default function ChatPage() {
     if (!currentUser?.id) return;
 
     try {
-      // Ensure OneSignal is loaded
-      if (!OneSignal) {
-        const module = await import('react-onesignal');
-        OneSignal = module.default;
-      }
-
-      console.log('Requesting notification permission...');
+      console.log('🔔 Requesting notification permission...');
 
       // Request permission using browser API
       const result = await Notification.requestPermission();
-      console.log('Permission result:', result);
+      console.log('🔔 Permission result:', result);
 
       if (result === 'granted') {
-        // Try to trigger OneSignal subscription
-        try {
-          console.log('Triggering OneSignal subscription...');
-          await OneSignal.showSlidedownPrompt();
-
-          // Wait for OneSignal to register
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          await getAndSaveSubscriptionId();
-          await getAndSaveSubscriptionId();
-        } catch (error) {
-          console.log('OneSignal subscription failed, trying direct approach...');
-          // Wait for OneSignal to register
-          await new Promise(resolve => setTimeout(resolve, 5000));
+        // Initialize OneSignal
+        const oneSignalInstance = await initializeOneSignal();
+        
+        if (oneSignalInstance) {
+          console.log('✅ OneSignal initialized, triggering subscription...');
+          
+          // Show OneSignal subscription prompt
+          try {
+            await oneSignalInstance.showSlidedownPrompt();
+            console.log('✅ OneSignal subscription prompt shown');
+            
+            // Wait for OneSignal to register
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Try to get and save subscription ID
+            await getAndSaveSubscriptionId();
+          } catch (promptError) {
+            console.log('⚠️ OneSignal prompt failed, trying direct approach...');
+            await getAndSaveSubscriptionId();
+          }
+        } else {
+          console.log('⚠️ OneSignal not available, trying IndexedDB only...');
           await getAndSaveSubscriptionId();
         }
+      } else {
+        console.log('⚠️ Notification permission denied');
       }
     } catch (error) {
-      console.error('Error enabling notifications:', error);
+      console.error('❌ Error enabling notifications:', error);
     }
   };
 
@@ -1541,6 +1741,70 @@ export default function ChatPage() {
     return true;
   };
 
+  const testOneSignalInitialization = async () => {
+    console.log('🧪 Testing OneSignal initialization...');
+    
+    try {
+      // Test basic initialization
+      const oneSignalInstance = await initializeOneSignal();
+      
+      if (oneSignalInstance) {
+        console.log('✅ OneSignal initialization test passed');
+        
+        // Test getting player ID
+        try {
+          const playerId = await oneSignalInstance.User.PushSubscription.id;
+          console.log('🎯 Player ID test result:', playerId);
+          
+          if (playerId) {
+            console.log('✅ Player ID retrieval test passed');
+            return { success: true, playerId };
+          } else {
+            console.log('⚠️ Player ID is null/undefined');
+            return { success: false, error: 'No Player ID available' };
+          }
+        } catch (idError) {
+          console.log('❌ Player ID retrieval test failed:', idError);
+          return { success: false, error: idError instanceof Error ? idError.message : String(idError) };
+        }
+      } else {
+        console.log('❌ OneSignal initialization test failed');
+        return { success: false, error: 'OneSignal initialization failed' };
+      }
+    } catch (error) {
+      console.error('❌ OneSignal test error:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  const testOfflineNotificationSystem = async () => {
+    console.log('🧪 Testing offline notification system...');
+    
+    if (!currentUser?.id) {
+      console.log('❌ No current user for offline test');
+      return;
+    }
+    
+    try {
+      // Test the backend notification endpoint
+      const response = await apiCall(`${config.getBackendUrl()}/api/debug/test-notification/${currentUser.id}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Offline notification test result:', result);
+        alert('Test notification sent! Check your browser notifications.');
+        return { success: true, result };
+      } else {
+        const error = await response.text();
+        console.error('❌ Offline notification test failed:', error);
+        return { success: false, error };
+      }
+    } catch (error) {
+      console.error('❌ Offline notification test error:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 relative overflow-hidden">
       {/* Mobile-specific meta viewport styles */}
@@ -1714,6 +1978,14 @@ export default function ChatPage() {
                         <DropdownMenuItem onClick={testNotification}>
                           <Bell className="mr-2 h-4 w-4" />
                           Test Notification
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testOneSignalInitialization}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Test OneSignal Init
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testOfflineNotificationSystem}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Test Offline Notifications
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={checkNotificationStatus}>
                           <Bell className="mr-2 h-4 w-4" />
@@ -1904,15 +2176,22 @@ export default function ChatPage() {
                       : contactStatus.online
                         ? "Online"
                         : contactStatus.lastSeen
-                          ? `Last seen ${Math.round((Date.now() - contactStatus.lastSeen) / 60000)} min ago`
-                          : ""}
+                          ? `Last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
+                          : "Offline"}
                   </p>
                   {/* Connection Status Indicator */}
                   <div className="flex items-center space-x-1 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${socketManager.isReadyForCalls() ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${
+                      connectionStatus === 'connected' ? 'bg-green-500' : 
+                      connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}></div>
                     <span className="text-xs text-gray-400">
-                      {socketManager.isReadyForCalls() ? 'Connected' : 'Disconnected'}
+                      {connectionStatus === 'connected' ? 'Connected' : 
+                       connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
                     </span>
+                    {!isOnline && (
+                      <span className="text-xs text-orange-500 ml-1">(Offline)</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1940,8 +2219,8 @@ export default function ChatPage() {
                       });
                     }
                   }}
-                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || !socketManager.isReadyForCalls()}
-                  title={!socketManager.isReadyForCalls() ? "Not connected to server" : "Start voice call"}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || connectionStatus !== 'connected'}
+                  title={connectionStatus !== 'connected' ? "Not connected to server" : "Start voice call"}
                 >
                   <Phone className="h-4 w-4" />
                 </Button>
@@ -1968,8 +2247,8 @@ export default function ChatPage() {
                       });
                     }
                   }}
-                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || !socketManager.isReadyForCalls()}
-                  title={!socketManager.isReadyForCalls() ? "Not connected to server" : "Start video call"}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || connectionStatus !== 'connected'}
+                  title={connectionStatus !== 'connected' ? "Not connected to server" : "Start video call"}
                 >
                   <Video className="h-4 w-4" />
                 </Button>
