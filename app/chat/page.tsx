@@ -2764,29 +2764,55 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Active Call Controls */}
-      {callState.isConnected && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg p-6 shadow-lg z-40">
-          <div className="flex items-center space-x-6">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => webrtcManager?.toggleMute()}
-              className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
-              style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => webrtcManager?.endCall()}
-              className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
-              style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <PhoneOff className="h-8 w-8" />
-            </Button>
-          </div>
+      {/* Voice Call Modal */}
+      {callState.isConnected && callState.callData && callState.callData.callType === 'voice' && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl p-4 flex flex-col items-center relative">
+            {/* Voice Call Controls - Large, always visible */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-6 z-10">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => webrtcManager?.toggleMute()}
+                className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
+                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => webrtcManager?.endCall()}
+                className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
+                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <PhoneOff className="h-8 w-8" />
+              </Button>
+            </div>
+            <div className="relative w-full flex flex-col items-center">
+              {/* Voice Call Display */}
+              <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[60vh]">
+                {/* Call Icon */}
+                <div className="w-32 h-32 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-8 animate-pulse">
+                  <Phone className="h-16 w-16 text-white" />
+                </div>
+                {/* Call Status */}
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-semibold text-white mb-2">Voice Call</h3>
+                  <p className="text-lg text-gray-300">
+                    {selectedContact?.name || 'Unknown Contact'}
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {callState.isMuted ? 'Microphone Muted' : 'Microphone Active'}
+                  </p>
+                </div>
+                {/* Call Duration (if needed) */}
+                <div className="text-center">
+                  <p className="text-sm text-gray-400">Call in progress...</p>
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
 
