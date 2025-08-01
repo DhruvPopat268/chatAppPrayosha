@@ -2058,47 +2058,7 @@ export default function ChatPage() {
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={enableNotifications}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testNotification}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Test Notification
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testOneSignalInitialization}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Test OneSignal Init
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={manuallyTriggerOneSignalSubscription}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Manual OneSignal Subscription
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testOfflineNotificationSystem}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Test Offline Notifications
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={checkNotificationStatus}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Check Notification Status
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testSubscriptionIdSaving}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Test Subscription ID Saving
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={debugSubscriptionProcess}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Debug Subscription Process
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={checkOneSignalEnvironment}>
-                          <Settings className="mr-2 h-4 w-4" />
-                          Check OneSignal Environment
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={clearOneSignalIndexedDB}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Clear OneSignal IndexedDB
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
+                        
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout
