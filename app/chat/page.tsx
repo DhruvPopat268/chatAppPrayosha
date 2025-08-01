@@ -624,18 +624,7 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [currentUser?.id]);
 
-  // Add this useEffect after your OneSignal/init useEffect
-  useEffect(() => {
-    if (typeof window !== 'undefined' && currentUser?.id) {
-      if ('Notification' in window) {
-        const permission = Notification.permission;
-        setPermissionStatus(permission);
-        if (permission === 'default' && !permissionRequested) {
-          setShowPermissionPrompt(true);
-        }
-      }
-    }
-  }, [currentUser, permissionRequested]);
+
 
   // App initialization useEffect
   useEffect(() => {
@@ -2281,19 +2270,6 @@ export default function ChatPage() {
                           ? `Last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
                           : "Offline"}
                   </p>
-                  {/* Connection Status Indicator */}
-                  <div className="flex items-center space-x-1 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
-                        connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}></div>
-                    <span className="text-xs text-gray-400">
-                      {connectionStatus === 'connected' ? 'Connected' :
-                        connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
-                    </span>
-                    {!isOnline && (
-                      <span className="text-xs text-orange-500 ml-1">(Offline)</span>
-                    )}
-                  </div>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -2728,7 +2704,7 @@ export default function ChatPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold">Incoming Call</h3>
-                <p className="text-gray-600">Voice Call</p>
+                <p className="text-gray-600">{callState.callData?.callType === 'video' ? 'Video Call' : 'Voice Call'}</p>
               </div>
               <div className="flex justify-center space-x-4">
                 <Button
@@ -2770,7 +2746,7 @@ export default function ChatPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold">Calling...</h3>
-                <p className="text-gray-600">Voice Call</p>
+                <p className="text-gray-600">{callState.callData?.callType === 'video' ? 'Video Call' : 'Voice Call'}</p>
               </div>
               <div className="flex justify-center">
                 <Button
@@ -2790,31 +2766,25 @@ export default function ChatPage() {
 
       {/* Active Call Controls */}
       {callState.isConnected && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg p-4 shadow-lg z-40">
-          <div className="flex items-center space-x-4">
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-lg p-6 shadow-lg z-40">
+          <div className="flex items-center space-x-6">
             <Button
               variant="outline"
-              size="sm"
+              size="lg"
               onClick={() => webrtcManager?.toggleMute()}
-              className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600" : "hover:bg-gray-100"}
+              className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
+              style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              {callState.isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
             </Button>
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => webrtcManager?.toggleSpeaker()}
-              className={callState.isSpeakerOn ? "bg-blue-500 text-white" : "hover:bg-gray-100"}
-            >
-              <Phone className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+              size="lg"
               onClick={() => webrtcManager?.endCall()}
-              className="bg-red-500 text-white hover:bg-red-600"
+              className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
+              style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              <PhoneOff className="h-4 w-4" />
+              <PhoneOff className="h-8 w-8" />
             </Button>
           </div>
         </div>
@@ -2918,17 +2888,7 @@ export default function ChatPage() {
         style={{ display: 'none' }}
       />
 
-      {showPermissionPrompt && permissionStatus === 'default' && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#fffbe6', padding: 16, textAlign: 'center', borderBottom: '1px solid #ffe58f' }}>
-          <span>Enable notifications to receive new message alerts!</span>
-          <button
-            style={{ marginLeft: 16, padding: '4px 12px', background: '#ffd666', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-            onClick={requestNotificationPermission}
-          >
-            Allow Notifications
-          </button>
-        </div>
-      )}
+
 
     </div>
   )
