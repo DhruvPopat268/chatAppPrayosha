@@ -61,13 +61,13 @@ import { useRouter } from 'next/navigation';
 let OneSignal: any = null;
 let OneSignalInitialized = false;
 
-// Initialize OneSignal with proper error handling
+// Initialize OneSignal with proper error handling and IndexedDB setup
 const initializeOneSignal = async () => {
   if (OneSignalInitialized) return OneSignal;
-
+  
   try {
     console.log('🔄 Starting OneSignal initialization...');
-
+    
     // Check if we're in a browser environment
     if (typeof window === 'undefined') {
       console.log('⚠️ Not in browser environment, skipping OneSignal init');
@@ -85,7 +85,7 @@ const initializeOneSignal = async () => {
     // Import OneSignal module
     const module = await import('react-onesignal');
     OneSignal = module.default;
-
+    
     // Check environment configuration
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
     if (!appId) {
@@ -94,39 +94,82 @@ const initializeOneSignal = async () => {
     }
 
     console.log('🔧 Initializing OneSignal with App ID:', appId);
-
-    // Initialize OneSignal with minimal configuration to avoid initialization issues
+    
+    // Clear any existing OneSignal IndexedDB to start fresh
+    try {
+      await clearOneSignalIndexedDB();
+      console.log('✅ Cleared existing OneSignal IndexedDB');
+    } catch (clearError) {
+      console.log('⚠️ Could not clear OneSignal IndexedDB:', clearError);
+    }
+    
+    // Initialize OneSignal with proper configuration
     await OneSignal.init({
       appId: appId,
       allowLocalhostAsSecureOrigin: true,
       serviceWorkerPath: '/OneSignalSDKWorker.js',
       serviceWorkerParam: { scope: '/' },
-      // Disable features that might cause initialization issues
+      // Enable features needed for proper initialization
       notifyButton: {
         enable: false,
       },
       welcomeNotification: {
         disable: true,
       },
-      autoRegister: false,
-      autoResubscribe: false,
+      // Enable auto-registration to ensure proper setup
+      autoRegister: true,
+      autoResubscribe: true,
       persistNotification: false,
-      // Add timeout to prevent hanging
-      timeout: 10000
+      // Add proper timeout
+      timeout: 15000
     });
 
     console.log('✅ OneSignal initialized successfully');
     OneSignalInitialized = true;
-
-    // Wait a bit for OneSignal to fully set up
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
+    
+    // Wait for OneSignal to fully set up and create IndexedDB structure
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
     return OneSignal;
   } catch (error) {
     console.error('❌ OneSignal initialization failed:', error);
     OneSignalInitialized = false;
     return null;
   }
+};
+
+// Helper to clear OneSignal IndexedDB
+const clearOneSignalIndexedDB = async () => {
+  return new Promise<void>((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      resolve();
+      return;
+    }
+    
+    const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
+    
+    request.onsuccess = () => {
+      const db = request.result;
+      db.close();
+      
+      const deleteRequest = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
+      
+      deleteRequest.onsuccess = () => {
+        console.log('✅ OneSignal IndexedDB cleared');
+        resolve();
+      };
+      
+      deleteRequest.onerror = () => {
+        console.log('⚠️ Could not clear OneSignal IndexedDB');
+        resolve(); // Don't fail the initialization
+      };
+    };
+    
+    request.onerror = () => {
+      console.log('⚠️ Could not open OneSignal IndexedDB for clearing');
+      resolve(); // Don't fail the initialization
+    };
+  });
 };
 
 interface Contact {
@@ -348,27 +391,71 @@ export default function ChatPage() {
   const getAndSaveSubscriptionId = async () => {
     console.log('🚀 Starting getAndSaveSubscriptionId...');
     console.log('👤 Current user:', currentUser);
-
+    
     try {
       // Initialize OneSignal first
       const oneSignalInstance = await initializeOneSignal();
-
+      
       if (oneSignalInstance) {
         console.log('🔍 Trying OneSignal direct method...');
         try {
+          // Check if push is supported
           const isSubscribed = await oneSignalInstance.Notifications.isPushSupported();
           console.log('📱 Push supported:', isSubscribed);
-
+          
           if (isSubscribed) {
-            const playerId = await oneSignalInstance.User.PushSubscription.id;
-            console.log('🎯 Got Player ID from OneSignal:', playerId);
-
+            // Request permission if not already granted
+            const permission = await oneSignalInstance.Notifications.permission;
+            console.log('🔔 Current permission:', permission);
+            
+            if (permission === 'default') {
+              console.log('🔔 Requesting notification permission...');
+              await oneSignalInstance.Notifications.requestPermission();
+              // Wait for permission to be processed
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            
+            // Try multiple methods to get Player ID
+            let playerId = null;
+            
+            // Method 1: Direct Player ID access
+            try {
+              playerId = await oneSignalInstance.User.PushSubscription.id;
+              console.log('🎯 Method 1 - Direct Player ID:', playerId);
+            } catch (method1Error) {
+              console.log('⚠️ Method 1 failed:', method1Error);
+            }
+            
+            // Method 2: Get from User object
+            if (!playerId) {
+              try {
+                const user = await oneSignalInstance.User.getOneSignalId();
+                playerId = user;
+                console.log('🎯 Method 2 - User OneSignal ID:', playerId);
+              } catch (method2Error) {
+                console.log('⚠️ Method 2 failed:', method2Error);
+              }
+            }
+            
+            // Method 3: Get from subscription object
+            if (!playerId) {
+              try {
+                const subscription = await oneSignalInstance.User.PushSubscription.optedIn;
+                if (subscription) {
+                  playerId = await oneSignalInstance.User.PushSubscription.id;
+                  console.log('🎯 Method 3 - Subscription Player ID:', playerId);
+                }
+              } catch (method3Error) {
+                console.log('⚠️ Method 3 failed:', method3Error);
+              }
+            }
+            
             if (playerId) {
               console.log('✅ Using OneSignal Player ID');
               await saveSubscriptionId(playerId);
               return;
             } else {
-              console.log('⚠️ OneSignal Player ID is null/undefined');
+              console.log('⚠️ All OneSignal methods failed to get Player ID');
             }
           } else {
             console.log('⚠️ Push notifications not supported');
@@ -380,7 +467,7 @@ export default function ChatPage() {
       } else {
         console.log('⚠️ OneSignal not available, trying IndexedDB...');
       }
-
+      
       // Fallback to IndexedDB method
       console.log('🗄️ Trying IndexedDB method...');
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
@@ -1678,40 +1765,7 @@ export default function ChatPage() {
     }
   };
 
-  const clearOneSignalIndexedDB = async () => {
-    console.log('🧹 Clearing OneSignal IndexedDB...');
 
-    try {
-      // Close any existing connections
-      const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
-
-      request.onsuccess = () => {
-        const db = request.result;
-        db.close();
-
-        // Delete the database
-        const deleteRequest = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
-
-        deleteRequest.onsuccess = () => {
-          console.log('✅ OneSignal IndexedDB deleted successfully');
-          alert('OneSignal IndexedDB cleared. Please refresh the page to reinitialize.');
-        };
-
-        deleteRequest.onerror = () => {
-          console.error('❌ Failed to delete OneSignal IndexedDB:', deleteRequest.error);
-          alert('Failed to clear OneSignal IndexedDB');
-        };
-      };
-
-      request.onerror = () => {
-        console.error('❌ Failed to open OneSignal IndexedDB for deletion:', request.error);
-        alert('Failed to access OneSignal IndexedDB');
-      };
-    } catch (error) {
-      console.error('❌ Error clearing OneSignal IndexedDB:', error);
-      alert('Error clearing OneSignal IndexedDB');
-    }
-  };
 
   const checkOneSignalEnvironment = () => {
     console.log('🔍 Checking OneSignal environment configuration...');
@@ -1802,6 +1856,50 @@ export default function ChatPage() {
     } catch (error) {
       console.error('❌ Offline notification test error:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  const manuallyTriggerOneSignalSubscription = async () => {
+    console.log('🔔 Manually triggering OneSignal subscription...');
+    
+    try {
+      // Initialize OneSignal
+      const oneSignalInstance = await initializeOneSignal();
+      
+      if (oneSignalInstance) {
+        console.log('✅ OneSignal initialized, showing subscription prompt...');
+        
+        // Show the subscription prompt
+        await oneSignalInstance.showSlidedownPrompt();
+        console.log('✅ Subscription prompt shown');
+        
+        // Wait for user interaction and OneSignal to process
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        
+        // Try to get the Player ID after subscription
+        try {
+          const playerId = await oneSignalInstance.User.PushSubscription.id;
+          console.log('🎯 Player ID after subscription:', playerId);
+          
+          if (playerId) {
+            console.log('✅ Successfully got Player ID, saving to backend...');
+            await saveSubscriptionId(playerId);
+            alert('OneSignal subscription successful! Player ID: ' + playerId);
+          } else {
+            console.log('⚠️ Still no Player ID after subscription');
+            alert('Subscription prompt shown but no Player ID generated yet. Please try again.');
+          }
+        } catch (idError) {
+          console.error('❌ Error getting Player ID after subscription:', idError);
+          alert('Subscription prompt shown but could not get Player ID. Please try again.');
+        }
+      } else {
+        console.error('❌ Could not initialize OneSignal');
+        alert('Could not initialize OneSignal. Please check your configuration.');
+      }
+    } catch (error) {
+      console.error('❌ Error triggering OneSignal subscription:', error);
+      alert('Error triggering OneSignal subscription: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -1971,7 +2069,47 @@ export default function ChatPage() {
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
-
+                        <DropdownMenuItem onClick={enableNotifications}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testNotification}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Test Notification
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testOneSignalInitialization}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Test OneSignal Init
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={manuallyTriggerOneSignalSubscription}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Manual OneSignal Subscription
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testOfflineNotificationSystem}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Test Offline Notifications
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={checkNotificationStatus}>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Check Notification Status
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testSubscriptionIdSaving}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Test Subscription ID Saving
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={debugSubscriptionProcess}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Debug Subscription Process
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={checkOneSignalEnvironment}>
+                          <Settings className="mr-2 h-4 w-4" />
+                          Check OneSignal Environment
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={clearOneSignalIndexedDB}>
+                          <Bug className="mr-2 h-4 w-4" />
+                          Clear OneSignal IndexedDB
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout

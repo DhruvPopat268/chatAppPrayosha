@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneSignal Test</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v17/OneSignalSDK.page.js" defer></script>
+</head>
+<body>
+    <h1>OneSignal Test Page</h1>
+    <p>This page tests OneSignal initialization in isolation.</p>
+    
+    <button id="initBtn">Initialize OneSignal</button>
+    <button id="subscribeBtn">Subscribe to Notifications</button>
+    <button id="getPlayerIdBtn">Get Player ID</button>
+    <button id="testNotificationBtn">Test Notification</button>
+    
+    <div id="output"></div>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            console.log(message);
+            output.innerHTML += '<p>' + message + '</p>';
+        }
+        
+        document.getElementById('initBtn').addEventListener('click', async () => {
+            try {
+                log('🔄 Initializing OneSignal...');
+                
+                await OneSignal.init({
+                    appId: 'YOUR_ONESIGNAL_APP_ID_HERE', // Replace with your actual App ID
+                    allowLocalhostAsSecureOrigin: true,
+                    serviceWorkerPath: '/OneSignalSDKWorker.js',
+                    serviceWorkerParam: { scope: '/' },
+                    notifyButton: { enable: false },
+                    welcomeNotification: { disable: true },
+                    autoRegister: true,
+                    autoResubscribe: true,
+                    persistNotification: false
+                });
+                
+                log('✅ OneSignal initialized successfully');
+            } catch (error) {
+                log('❌ OneSignal initialization failed: ' + error.message);
+            }
+        });
+        
+        document.getElementById('subscribeBtn').addEventListener('click', async () => {
+            try {
+                log('🔔 Requesting notification permission...');
+                const permission = await OneSignal.Notifications.requestPermission();
+                log('🔔 Permission result: ' + permission);
+                
+                if (permission === 'granted') {
+                    log('✅ Permission granted');
+                } else {
+                    log('❌ Permission denied');
+                }
+            } catch (error) {
+                log('❌ Error requesting permission: ' + error.message);
+            }
+        });
+        
+        document.getElementById('getPlayerIdBtn').addEventListener('click', async () => {
+            try {
+                log('🎯 Getting Player ID...');
+                const playerId = await OneSignal.User.PushSubscription.id;
+                log('🎯 Player ID: ' + (playerId || 'null/undefined'));
+                
+                if (playerId) {
+                    log('✅ Player ID retrieved successfully');
+                } else {
+                    log('⚠️ No Player ID available');
+                }
+            } catch (error) {
+                log('❌ Error getting Player ID: ' + error.message);
+            }
+        });
+        
+        document.getElementById('testNotificationBtn').addEventListener('click', async () => {
+            try {
+                log('🧪 Testing notification...');
+                await OneSignal.Notifications.add({
+                    title: 'Test Notification',
+                    message: 'This is a test notification from OneSignal',
+                    url: '/chat'
+                });
+                log('✅ Test notification sent');
+            } catch (error) {
+                log('❌ Error sending test notification: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html> 
