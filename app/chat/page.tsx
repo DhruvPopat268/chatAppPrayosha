@@ -64,10 +64,10 @@ let OneSignalInitialized = false;
 // Initialize OneSignal with proper error handling
 const initializeOneSignal = async () => {
   if (OneSignalInitialized) return OneSignal;
-  
+
   try {
     console.log('🔄 Starting OneSignal initialization...');
-    
+
     // Check if we're in a browser environment
     if (typeof window === 'undefined') {
       console.log('⚠️ Not in browser environment, skipping OneSignal init');
@@ -85,7 +85,7 @@ const initializeOneSignal = async () => {
     // Import OneSignal module
     const module = await import('react-onesignal');
     OneSignal = module.default;
-    
+
     // Check environment configuration
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
     if (!appId) {
@@ -94,7 +94,7 @@ const initializeOneSignal = async () => {
     }
 
     console.log('🔧 Initializing OneSignal with App ID:', appId);
-    
+
     // Initialize OneSignal with minimal configuration to avoid initialization issues
     await OneSignal.init({
       appId: appId,
@@ -117,10 +117,10 @@ const initializeOneSignal = async () => {
 
     console.log('✅ OneSignal initialized successfully');
     OneSignalInitialized = true;
-    
+
     // Wait a bit for OneSignal to fully set up
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     return OneSignal;
   } catch (error) {
     console.error('❌ OneSignal initialization failed:', error);
@@ -278,12 +278,12 @@ export default function ChatPage() {
   function getSubscriptionIdFromIndexedDB() {
     return new Promise<string>((resolve, reject) => {
       console.log('🗄️ Attempting to access OneSignal IndexedDB...');
-      
+
       if (typeof window === 'undefined' || !window.indexedDB) {
         reject('❌ IndexedDB not available');
         return;
       }
-      
+
       const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
 
       request.onerror = () => {
@@ -295,7 +295,7 @@ export default function ChatPage() {
         const db = request.result;
         console.log('✅ OneSignal IndexedDB opened successfully');
         console.log('📊 Database object stores:', db.objectStoreNames);
-        
+
         // Check if the subscriptions object store exists
         if (!db.objectStoreNames.contains('subscriptions')) {
           console.error('❌ Subscriptions object store not found in IndexedDB');
@@ -312,7 +312,7 @@ export default function ChatPage() {
           getAllRequest.onsuccess = () => {
             const subs = getAllRequest.result;
             console.log('📦 Retrieved subscriptions from IndexedDB:', subs);
-            
+
             if (subs && subs.length > 0 && subs[0].id) {
               console.log('✅ Found subscription ID:', subs[0].id);
               resolve(subs[0].id); // ✅ Subscription ID (aka Player ID)
@@ -335,7 +335,7 @@ export default function ChatPage() {
       request.onupgradeneeded = (event) => {
         console.log('🔄 IndexedDB upgrade needed');
         const db = (event.target as IDBOpenDBRequest).result;
-        
+
         // Check if subscriptions store exists, if not create it
         if (!db.objectStoreNames.contains('subscriptions')) {
           console.log('📝 Creating subscriptions object store...');
@@ -348,21 +348,21 @@ export default function ChatPage() {
   const getAndSaveSubscriptionId = async () => {
     console.log('🚀 Starting getAndSaveSubscriptionId...');
     console.log('👤 Current user:', currentUser);
-    
+
     try {
       // Initialize OneSignal first
       const oneSignalInstance = await initializeOneSignal();
-      
+
       if (oneSignalInstance) {
         console.log('🔍 Trying OneSignal direct method...');
         try {
           const isSubscribed = await oneSignalInstance.Notifications.isPushSupported();
           console.log('📱 Push supported:', isSubscribed);
-          
+
           if (isSubscribed) {
             const playerId = await oneSignalInstance.User.PushSubscription.id;
             console.log('🎯 Got Player ID from OneSignal:', playerId);
-            
+
             if (playerId) {
               console.log('✅ Using OneSignal Player ID');
               await saveSubscriptionId(playerId);
@@ -380,7 +380,7 @@ export default function ChatPage() {
       } else {
         console.log('⚠️ OneSignal not available, trying IndexedDB...');
       }
-      
+
       // Fallback to IndexedDB method
       console.log('🗄️ Trying IndexedDB method...');
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
@@ -408,10 +408,10 @@ export default function ChatPage() {
       console.log('👤 Current user ID:', currentUser.id);
       console.log('🔑 Subscription ID:', subscriptionId);
       console.log('🌐 Backend URL:', config.getBackendUrl());
-      
+
       const requestBody = { playerId: subscriptionId, userId: currentUser.id };
       console.log('📤 Request body:', requestBody);
-      
+
       const response = await apiCall(`${config.getBackendUrl()}/api/save-onesignal-id`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -467,27 +467,27 @@ export default function ChatPage() {
   // Push notification setup useEffect
   useEffect(() => {
     if (!currentUser?.id) return;
-  
+
     const initializeNotifications = async () => {
       try {
         console.log('🚀 Starting notification initialization for user:', currentUser.id);
-        
+
         // Check if we're in a browser environment
         if (typeof window === 'undefined') {
           console.log('⚠️ Not in browser environment, skipping notification setup');
           return;
         }
-        
+
         // Check notification permission first
         if ('Notification' in window) {
           const permission = Notification.permission;
           console.log('🔔 Current notification permission:', permission);
-          
+
           if (permission === 'default') {
             console.log('🔔 Requesting notification permission...');
             const newPermission = await Notification.requestPermission();
             console.log('🔔 New permission status:', newPermission);
-            
+
             if (newPermission !== 'granted') {
               console.log('⚠️ Notification permission denied');
               return;
@@ -497,21 +497,21 @@ export default function ChatPage() {
             return;
           }
         }
-        
+
         // Initialize OneSignal
         const oneSignalInstance = await initializeOneSignal();
-        
+
         if (oneSignalInstance) {
           console.log('✅ OneSignal initialized successfully');
-          
+
           // Wait for OneSignal to be ready
           await new Promise(resolve => setTimeout(resolve, 3000));
-          
+
           // Try to get player ID
           try {
             const playerId = await oneSignalInstance.User.PushSubscription.id;
             console.log('🎯 OneSignal Player ID:', playerId);
-            
+
             if (playerId) {
               console.log('✅ OneSignal ready with Player ID, saving to backend...');
               await saveSubscriptionId(playerId);
@@ -536,7 +536,7 @@ export default function ChatPage() {
     const timer = setTimeout(initializeNotifications, 2000);
     return () => clearTimeout(timer);
   }, [currentUser?.id]);
-  
+
   // Add this useEffect after your OneSignal/init useEffect
   useEffect(() => {
     if (typeof window !== 'undefined' && currentUser?.id) {
@@ -549,7 +549,7 @@ export default function ChatPage() {
       }
     }
   }, [currentUser, permissionRequested]);
-  
+
   // App initialization useEffect
   useEffect(() => {
     const initializeApp = async () => {
@@ -604,7 +604,7 @@ export default function ChatPage() {
             // Load messages for the first contact
             loadMessages(firstContact.id)
           }
-          
+
         } else {
           console.error('Failed to load contacts')
         }
@@ -797,7 +797,7 @@ export default function ChatPage() {
     setIsSearching(true);
     const url = `${config.getBackendUrl()}/api/auth/search?q=${encodeURIComponent(friendSearchQuery)}`;
     console.log('Searching users with URL:', url);
-    
+
     const token = localStorage.getItem('user_token');
     fetch(url, {
       headers: {
@@ -930,13 +930,13 @@ export default function ChatPage() {
   const getOfflineStatusMessage = (lastSeenTime: number) => {
     const now = Date.now();
     const diffInMinutes = Math.floor((now - lastSeenTime) / (1000 * 60));
-    
+
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
   };
@@ -963,18 +963,18 @@ export default function ChatPage() {
       if (result === 'granted') {
         // Initialize OneSignal
         const oneSignalInstance = await initializeOneSignal();
-        
+
         if (oneSignalInstance) {
           console.log('✅ OneSignal initialized, triggering subscription...');
-          
+
           // Show OneSignal subscription prompt
           try {
             await oneSignalInstance.showSlidedownPrompt();
             console.log('✅ OneSignal subscription prompt shown');
-            
+
             // Wait for OneSignal to register
             await new Promise(resolve => setTimeout(resolve, 5000));
-            
+
             // Try to get and save subscription ID
             await getAndSaveSubscriptionId();
           } catch (promptError) {
@@ -1007,15 +1007,15 @@ export default function ChatPage() {
     if (isSendButtonClickedRef.current) {
       return;
     }
-    
+
     // Check if the related target (what we're clicking on) is the send button
     const relatedTarget = event.relatedTarget as HTMLElement;
-    
+
     if (relatedTarget && sendButtonRef.current && sendButtonRef.current.contains(relatedTarget)) {
       // Don't close keyboard if clicking on send button
       return;
     }
-    
+
     // For other blur events, let the viewport change handler determine keyboard state
     // This prevents keyboard from closing when clicking outside the input
   }
@@ -1027,7 +1027,7 @@ export default function ChatPage() {
         const viewport = window.visualViewport;
         const isKeyboardOpen = viewport.height < window.innerHeight * 0.8; // More sensitive detection
         setIsKeyboardVisible(isKeyboardOpen);
-        
+
         // If keyboard is open, scroll to bottom immediately
         if (isKeyboardOpen) {
           setTimeout(() => {
@@ -1042,7 +1042,7 @@ export default function ChatPage() {
       if (typeof window !== 'undefined' && !window.visualViewport) {
         const isKeyboardOpen = window.innerHeight < window.outerHeight * 0.8;
         setIsKeyboardVisible(isKeyboardOpen);
-        
+
         if (isKeyboardOpen) {
           setTimeout(() => {
             scrollToBottom();
@@ -1250,8 +1250,8 @@ export default function ChatPage() {
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     setTimeout(() => {
       if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ 
-          behavior, 
+        messagesEndRef.current.scrollIntoView({
+          behavior,
           block: 'end',
           inline: 'nearest'
         });
@@ -1270,14 +1270,14 @@ export default function ChatPage() {
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const target = event.target as HTMLDivElement;
     const { scrollTop, scrollHeight, clientHeight } = target;
-    
+
     // Check if user is at the bottom
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 10;
     setIsAtBottom(isAtBottom);
-    
+
     // Show scroll to bottom button if not at bottom
     setShowScrollToBottom(!isAtBottom);
-    
+
     // Reset new message count if user scrolls to bottom
     if (isAtBottom) {
       setNewMessageCount(0);
@@ -1475,7 +1475,7 @@ export default function ChatPage() {
       if (response.ok) {
         const config = await response.json();
         console.log('OneSignal config:', config);
-        
+
         const userResponse = await apiCall(`${config.getBackendUrl()}/api/debug/validate-onesignal-user/${currentUser.id}`);
         if (userResponse.ok) {
           const userData = await userResponse.json();
@@ -1492,14 +1492,14 @@ export default function ChatPage() {
       console.error('❌ No current user found');
       return;
     }
-    
+
     console.log('🧪 Testing subscription ID saving...');
     console.log('👤 Current user:', currentUser);
-    
+
     // Test with a dummy subscription ID first
     const testSubscriptionId = 'test-subscription-id-' + Date.now();
     console.log('🧪 Using test subscription ID:', testSubscriptionId);
-    
+
     try {
       await saveSubscriptionId(testSubscriptionId);
       console.log('✅ Test subscription ID saved successfully');
@@ -1513,12 +1513,12 @@ export default function ChatPage() {
     console.log('👤 Current user:', currentUser);
     console.log('🔔 Notification permission:', Notification.permission);
     console.log('📱 OneSignal available:', !!OneSignal);
-    
+
     if (OneSignal) {
       try {
         const isSupported = await OneSignal.Notifications.isPushSupported();
         console.log('📱 Push supported:', isSupported);
-        
+
         if (isSupported) {
           const playerId = await OneSignal.User.PushSubscription.id;
           console.log('🎯 Current OneSignal Player ID:', playerId);
@@ -1527,7 +1527,7 @@ export default function ChatPage() {
         console.error('❌ OneSignal debug error:', error);
       }
     }
-    
+
     // Test IndexedDB
     try {
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
@@ -1539,7 +1539,7 @@ export default function ChatPage() {
 
   const initializeOneSignalSimple = async () => {
     console.log('🔄 Trying simple OneSignal initialization...');
-    
+
     try {
       if (!OneSignal) {
         const module = await import('react-onesignal');
@@ -1555,10 +1555,10 @@ export default function ChatPage() {
       });
 
       console.log('✅ Simple OneSignal initialization successful');
-      
+
       // Wait for initialization
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // Try to get player ID
       try {
         const playerId = await OneSignal.User.PushSubscription.id;
@@ -1576,7 +1576,7 @@ export default function ChatPage() {
 
   const initializeOneSignalProperly = async () => {
     console.log('🚀 Starting proper OneSignal initialization...');
-    
+
     try {
       // First, ensure OneSignal is loaded properly
       if (!OneSignal) {
@@ -1604,10 +1604,10 @@ export default function ChatPage() {
       }
 
       console.log('🔧 Initializing OneSignal with proper configuration...');
-      
+
       // Wait a bit before initialization to ensure everything is ready
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       await OneSignal.init({
         appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '',
         allowLocalhostAsSecureOrigin: true,
@@ -1626,30 +1626,30 @@ export default function ChatPage() {
       });
 
       console.log('✅ OneSignal initialized successfully');
-      
+
       // Wait for OneSignal to fully set up
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       // Check if push is supported
       try {
         const isSupported = await OneSignal.Notifications.isPushSupported();
         console.log('📱 Push notifications supported:', isSupported);
-        
+
         if (isSupported) {
           // Request permission if not already granted
           const permission = await OneSignal.Notifications.permission;
           console.log('🔔 Current permission:', permission);
-          
+
           if (permission === 'default') {
             console.log('🔔 Requesting notification permission...');
             await OneSignal.Notifications.requestPermission();
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
-          
+
           // Get the player ID
           const playerId = await OneSignal.User.PushSubscription.id;
           console.log('🎯 OneSignal Player ID:', playerId);
-          
+
           if (playerId) {
             console.log('✅ OneSignal properly initialized with Player ID');
             return playerId;
@@ -1662,7 +1662,7 @@ export default function ChatPage() {
       } catch (apiError) {
         console.error('❌ Error accessing OneSignal API:', apiError);
       }
-      
+
       return null;
     } catch (error) {
       console.error('❌ OneSignal initialization failed:', error);
@@ -1671,7 +1671,7 @@ export default function ChatPage() {
         stack: error instanceof Error ? error.stack : undefined,
         name: error instanceof Error ? error.name : 'Unknown'
       });
-      
+
       // Try simple initialization as fallback
       console.log('🔄 Trying simple initialization as fallback...');
       return await initializeOneSignalSimple();
@@ -1680,29 +1680,29 @@ export default function ChatPage() {
 
   const clearOneSignalIndexedDB = async () => {
     console.log('🧹 Clearing OneSignal IndexedDB...');
-    
+
     try {
       // Close any existing connections
       const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
-      
+
       request.onsuccess = () => {
         const db = request.result;
         db.close();
-        
+
         // Delete the database
         const deleteRequest = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
-        
+
         deleteRequest.onsuccess = () => {
           console.log('✅ OneSignal IndexedDB deleted successfully');
           alert('OneSignal IndexedDB cleared. Please refresh the page to reinitialize.');
         };
-        
+
         deleteRequest.onerror = () => {
           console.error('❌ Failed to delete OneSignal IndexedDB:', deleteRequest.error);
           alert('Failed to clear OneSignal IndexedDB');
         };
       };
-      
+
       request.onerror = () => {
         console.error('❌ Failed to open OneSignal IndexedDB for deletion:', request.error);
         alert('Failed to access OneSignal IndexedDB');
@@ -1715,47 +1715,47 @@ export default function ChatPage() {
 
   const checkOneSignalEnvironment = () => {
     console.log('🔍 Checking OneSignal environment configuration...');
-    
+
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
     const hasAppId = !!appId;
-    
+
     console.log('📋 Environment check results:');
     console.log('  - NEXT_PUBLIC_ONESIGNAL_APP_ID:', hasAppId ? '✅ Set' : '❌ Not set');
     console.log('  - App ID value:', appId || 'undefined');
     console.log('  - App ID length:', appId?.length || 0);
     console.log('  - Is valid format:', appId?.length === 36 ? '✅ Yes' : '❌ No');
-    
+
     if (!hasAppId) {
       console.error('❌ NEXT_PUBLIC_ONESIGNAL_APP_ID is not set in environment variables');
       alert('OneSignal App ID is not configured. Please check your .env.local file.');
       return false;
     }
-    
+
     if (appId.length !== 36) {
       console.error('❌ OneSignal App ID format is invalid (should be 36 characters)');
       alert('OneSignal App ID format is invalid. Please check your configuration.');
       return false;
     }
-    
+
     console.log('✅ OneSignal environment configuration is valid');
     return true;
   };
 
   const testOneSignalInitialization = async () => {
     console.log('🧪 Testing OneSignal initialization...');
-    
+
     try {
       // Test basic initialization
       const oneSignalInstance = await initializeOneSignal();
-      
+
       if (oneSignalInstance) {
         console.log('✅ OneSignal initialization test passed');
-        
+
         // Test getting player ID
         try {
           const playerId = await oneSignalInstance.User.PushSubscription.id;
           console.log('🎯 Player ID test result:', playerId);
-          
+
           if (playerId) {
             console.log('✅ Player ID retrieval test passed');
             return { success: true, playerId };
@@ -1779,16 +1779,16 @@ export default function ChatPage() {
 
   const testOfflineNotificationSystem = async () => {
     console.log('🧪 Testing offline notification system...');
-    
+
     if (!currentUser?.id) {
       console.log('❌ No current user for offline test');
       return;
     }
-    
+
     try {
       // Test the backend notification endpoint
       const response = await apiCall(`${config.getBackendUrl()}/api/debug/test-notification/${currentUser.id}`);
-      
+
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Offline notification test result:', result);
@@ -1841,8 +1841,8 @@ export default function ChatPage() {
       <div
         className={cn(
           "bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out relative",
-          isSidebarOpen 
-            ? "w-80 fixed md:relative inset-y-0 left-0 md:left-auto z-10" 
+          isSidebarOpen
+            ? "w-80 fixed md:relative inset-y-0 left-0 md:left-auto z-10"
             : "w-0 md:w-12 overflow-hidden z-20 md:z-auto"
         )}
       >
@@ -1888,8 +1888,8 @@ export default function ChatPage() {
                   <div className="flex items-center space-x-2">
                     <Dialog open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen}>
                       <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
                         >
@@ -1971,43 +1971,7 @@ export default function ChatPage() {
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={enableNotifications}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testNotification}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Test Notification
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testOneSignalInitialization}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Test OneSignal Init
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testOfflineNotificationSystem}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Test Offline Notifications
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={checkNotificationStatus}>
-                          <Bell className="mr-2 h-4 w-4" />
-                          Check Notification Status
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testSubscriptionIdSaving}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Test Subscription ID Saving
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={debugSubscriptionProcess}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Debug Subscription Process
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={checkOneSignalEnvironment}>
-                          <Settings className="mr-2 h-4 w-4" />
-                          Check OneSignal Environment
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={clearOneSignalIndexedDB}>
-                          <Bug className="mr-2 h-4 w-4" />
-                          Clear OneSignal IndexedDB
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
+
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout
@@ -2117,15 +2081,15 @@ export default function ChatPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div 
+      <div
         ref={chatContainerRef}
         className={cn(
           "flex-1 flex flex-col bg-white relative",
           isSidebarOpen ? "z-0" : "z-10"
         )}
         style={{
-          height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport 
-            ? `${window.visualViewport?.height || window.innerHeight}px` 
+          height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport
+            ? `${window.visualViewport?.height || window.innerHeight}px`
             : "100vh",
           // Mobile-specific height handling
           minHeight: "100vh",
@@ -2140,14 +2104,14 @@ export default function ChatPage() {
           isSidebarOpen ? "z-50" : "z-50", // Always high z-index for mobile
           isKeyboardVisible && "mobile-header-visible" // Add mobile-specific class when keyboard is visible
         )}
-        style={{
-          // Ensure header stays visible even when keyboard is open
-          position: isKeyboardVisible ? 'fixed' : 'sticky',
-          top: isKeyboardVisible ? '0' : '0',
-          left: '0',
-          right: '0',
-          zIndex: 9999, // Ensure it's always on top
-        }}>
+          style={{
+            // Ensure header stays visible even when keyboard is open
+            position: isKeyboardVisible ? 'fixed' : 'sticky',
+            top: isKeyboardVisible ? '0' : '0',
+            left: '0',
+            right: '0',
+            zIndex: 9999, // Ensure it's always on top
+          }}>
           {/* Contact header - Always visible */}
           {selectedContact ? (
             <div className="p-4 flex items-center justify-between flex-shrink-0 border-t border-gray-100">
@@ -2181,13 +2145,12 @@ export default function ChatPage() {
                   </p>
                   {/* Connection Status Indicator */}
                   <div className="flex items-center space-x-1 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${
-                      connectionStatus === 'connected' ? 'bg-green-500' : 
-                      connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
-                    }`}></div>
+                    <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
+                        connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}></div>
                     <span className="text-xs text-gray-400">
-                      {connectionStatus === 'connected' ? 'Connected' : 
-                       connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                      {connectionStatus === 'connected' ? 'Connected' :
+                        connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
                     </span>
                     {!isOnline && (
                       <span className="text-xs text-orange-500 ml-1">(Offline)</span>
@@ -2206,7 +2169,7 @@ export default function ChatPage() {
                       console.log('Starting voice call to:', selectedContact.id);
                       console.log('Socket status:', socketManager.getConnectionStatus());
                       console.log('WebRTC manager state:', webrtcManager.getConnectionDiagnostics());
-                      
+
                       const success = await webrtcManager.startVoiceCall(selectedContact.id);
                       if (!success) {
                         console.error('Failed to start voice call');
@@ -2234,7 +2197,7 @@ export default function ChatPage() {
                       console.log('Starting video call to:', selectedContact.id);
                       console.log('Socket status:', socketManager.getConnectionStatus());
                       console.log('WebRTC manager state:', webrtcManager.getConnectionDiagnostics());
-                      
+
                       const success = await webrtcManager.startVideoCall(selectedContact.id);
                       if (!success) {
                         console.error('Failed to start video call');
@@ -2281,7 +2244,7 @@ export default function ChatPage() {
 
         {/* Messages - Scrollable area with proper spacing for sticky footer */}
         <div className="flex-1 overflow-hidden relative">
-          <ScrollArea 
+          <ScrollArea
             ref={scrollAreaRef}
             className={cn(
               "h-full p-4 pb-24", // Increased bottom padding for mobile
@@ -2314,8 +2277,8 @@ export default function ChatPage() {
                     <div
                       className={cn(
                         "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
-                        message.senderId === "me" 
-                          ? "bg-blue-500 text-white rounded-br-md" 
+                        message.senderId === "me"
+                          ? "bg-blue-500 text-white rounded-br-md"
                           : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
                       )}
                     >
@@ -2337,10 +2300,10 @@ export default function ChatPage() {
                         <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
                           <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <a 
-                              href={message.content} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
+                            <a
+                              href={message.content}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="text-sm font-medium underline hover:no-underline block truncate"
                             >
                               {message.fileName || 'Download file'}
@@ -2394,19 +2357,19 @@ export default function ChatPage() {
             // Ensure the input sits directly on top of the keyboard
             bottom: isKeyboardVisible ? '0' : '0',
             // Add safe area padding for mobile devices
-            paddingBottom: isKeyboardVisible 
-              ? '8px' 
+            paddingBottom: isKeyboardVisible
+              ? '8px'
               : `calc(16px + env(safe-area-inset-bottom, 0px))`,
           }}
         >
           {/* Subtle top border indicator */}
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 opacity-50"></div>
-          
+
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleImageButtonClick} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleImageButtonClick}
               disabled={isUploadingImage}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"
               title="Send image"
@@ -2420,10 +2383,10 @@ export default function ChatPage() {
               className="hidden"
               onChange={handleImageChange}
             />
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={handleFileButtonClick} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleFileButtonClick}
               disabled={isUploadingImage}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"
               title="Send file"
@@ -2458,12 +2421,12 @@ export default function ChatPage() {
                 autoCapitalize="sentences"
               />
             </div>
-            <div 
+            <div
               className="flex-shrink-0"
               onMouseDown={(e) => e.preventDefault()}
               onTouchStart={(e) => e.preventDefault()}
             >
-              <Button 
+              <Button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -2475,12 +2438,12 @@ export default function ChatPage() {
                   sendMessage();
                 }}
                 ref={sendButtonRef}
-                size="sm" 
+                size="sm"
                 disabled={isUploadingImage || !newMessage.trim()}
                 className={cn(
                   "p-2 rounded-full transition-all duration-200",
-                  newMessage.trim() 
-                    ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md" 
+                  newMessage.trim()
+                    ? "bg-blue-500 hover:bg-blue-600 text-white shadow-md"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 )}
                 title="Send message"
