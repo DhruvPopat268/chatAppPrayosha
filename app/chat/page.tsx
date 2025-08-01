@@ -821,7 +821,7 @@ export default function ChatPage() {
           id: message._id,
           senderId: message.senderId._id === currentUser.id ? "me" : message.senderId._id,
           content: message.content,
-          timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
           type: message.type,
           fileName: message.fileName,
           fileSize: message.fileSize,
@@ -1162,7 +1162,7 @@ export default function ChatPage() {
       id: Date.now().toString(),
       senderId: "me",
       content: newMessage,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
       type: "text",
     };
 
@@ -1201,7 +1201,7 @@ export default function ChatPage() {
       id: Date.now().toString(),
       senderId: "me",
       content: "",
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
       type: type,
       fileName: type === "file" ? "document.pdf" : undefined,
       fileSize: type === "file" ? "2.4 MB" : undefined,
@@ -1279,7 +1279,7 @@ export default function ChatPage() {
           id: msg._id,
           senderId: msg.senderId._id === currentUser?.id ? "me" : msg.senderId._id,
           content: msg.content,
-          timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
           type: msg.type,
           fileName: msg.fileName,
           fileSize: msg.fileSize,
@@ -1433,7 +1433,7 @@ export default function ChatPage() {
         id: Date.now().toString(),
         senderId: "me",
         content: url,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
         type: "image",
       };
       setMessages(prev => [...prev, message]);
@@ -1455,7 +1455,7 @@ export default function ChatPage() {
         id: Date.now().toString(),
         senderId: "me",
         content: url,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
         type: "file",
         fileName: file.name,
         fileSize: (file.size / 1024 / 1024).toFixed(2) + ' MB',
