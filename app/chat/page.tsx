@@ -2444,7 +2444,7 @@ export default function ChatPage() {
           }}>
           {/* Contact header - Always visible */}
           {selectedContact ? (
-            <div className="p-4 flex items-center justify-between flex-shrink-0 border-t border-gray-100">
+            <div className="p-4 flex items-center justify-between flex-shrink-0 border-t border-gray-100 fixed top-10 ">
               <div className="flex items-center space-x-3">
                 <Button
                   variant="ghost"
