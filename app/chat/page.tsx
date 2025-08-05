@@ -64,10 +64,10 @@ let OneSignalInitialized = false;
 // Initialize OneSignal with proper error handling and IndexedDB setup
 const initializeOneSignal = async () => {
   if (OneSignalInitialized) return OneSignal;
-  
+
   try {
     console.log('🔄 Starting OneSignal initialization...');
-    
+
     // Check if we're in a browser environment
     if (typeof window === 'undefined') {
       console.log('⚠️ Not in browser environment, skipping OneSignal init');
@@ -85,7 +85,7 @@ const initializeOneSignal = async () => {
     // Import OneSignal module
     const module = await import('react-onesignal');
     OneSignal = module.default;
-    
+
     // Check environment configuration
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
     if (!appId) {
@@ -94,7 +94,7 @@ const initializeOneSignal = async () => {
     }
 
     console.log('🔧 Initializing OneSignal with App ID:', appId);
-    
+
     // Clear any existing OneSignal IndexedDB to start fresh
     try {
       await clearOneSignalIndexedDB();
@@ -102,7 +102,7 @@ const initializeOneSignal = async () => {
     } catch (clearError) {
       console.log('⚠️ Could not clear OneSignal IndexedDB:', clearError);
     }
-    
+
     // Initialize OneSignal with proper configuration
     await OneSignal.init({
       appId: appId,
@@ -165,14 +165,14 @@ const initializeOneSignal = async () => {
     });
 
     console.log('✅ OneSignal initialized successfully');
-    
+
     // Wait for OneSignal to be fully ready
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Check if user is subscribed
     const isSubscribed = await OneSignal.User.pushSubscription.optedIn;
     console.log('📱 User subscription status:', isSubscribed);
-    
+
     OneSignalInitialized = true;
     return OneSignal;
   } catch (error) {
@@ -188,26 +188,26 @@ const clearOneSignalIndexedDB = async () => {
       resolve();
       return;
     }
-    
+
     const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
-    
+
     request.onsuccess = () => {
       const db = request.result;
       db.close();
-      
+
       const deleteRequest = indexedDB.deleteDatabase('ONE_SIGNAL_SDK_DB');
-      
+
       deleteRequest.onsuccess = () => {
         console.log('✅ OneSignal IndexedDB cleared');
         resolve();
       };
-      
+
       deleteRequest.onerror = () => {
         console.log('⚠️ Could not clear OneSignal IndexedDB');
         resolve(); // Don't fail the initialization
       };
     };
-    
+
     request.onerror = () => {
       console.log('⚠️ Could not open OneSignal IndexedDB for clearing');
       resolve(); // Don't fail the initialization
@@ -387,22 +387,22 @@ export default function ChatPage() {
         if (!db.objectStoreNames.contains('subscriptions')) {
           console.error('❌ Subscriptions object store not found in IndexedDB');
           console.log('📋 Available object stores:', Array.from(db.objectStoreNames));
-          
+
           // Try to find any object store that might contain subscription data
           const availableStores = Array.from(db.objectStoreNames);
           console.log('🔍 Searching through available stores for subscription data...');
-          
+
           // Try to find subscription data in other stores
           for (const storeName of availableStores) {
             try {
               const transaction = db.transaction([storeName], 'readonly');
               const store = transaction.objectStore(storeName);
               const getAllRequest = store.getAll();
-              
+
               getAllRequest.onsuccess = () => {
                 const data = getAllRequest.result;
                 console.log(`📦 Data in ${storeName}:`, data);
-                
+
                 // Look for any object that might contain a subscription ID
                 if (data && data.length > 0) {
                   for (const item of data) {
@@ -415,7 +415,7 @@ export default function ChatPage() {
                   }
                 }
               };
-              
+
               getAllRequest.onerror = () => {
                 console.log(`⚠️ Could not read from ${storeName}:`, getAllRequest.error);
               };
@@ -423,7 +423,7 @@ export default function ChatPage() {
               console.log(`⚠️ Error accessing ${storeName}:`, error);
             }
           }
-          
+
           reject('❌ Subscriptions object store not found. Available stores: ' + Array.from(db.objectStoreNames).join(', '));
           return;
         }
@@ -447,13 +447,13 @@ export default function ChatPage() {
                   return;
                 }
               }
-              
+
               console.log('⚠️ No valid subscription ID found in subscriptions store');
               console.log('📋 Available fields in first subscription:', subs[0] ? Object.keys(subs[0]) : 'No data');
             } else {
               console.log('⚠️ No subscriptions found in IndexedDB');
             }
-            
+
             reject('❌ No subscription ID found in IndexedDB');
           };
 
@@ -483,39 +483,39 @@ export default function ChatPage() {
   const getAndSaveSubscriptionId = async () => {
     console.log('🚀 Starting getAndSaveSubscriptionId...');
     console.log('👤 Current user:', currentUser);
-    
+
     try {
       // Initialize OneSignal first
       const oneSignalInstance = await initializeOneSignal();
-      
+
       if (oneSignalInstance) {
         console.log('🔍 Trying OneSignal direct method...');
         try {
           // Check if push is supported
           const isSubscribed = await oneSignalInstance.Notifications.isPushSupported();
           console.log('📱 Push supported:', isSubscribed);
-          
+
           if (isSubscribed) {
             // Check current permission status
             const permission = await oneSignalInstance.Notifications.permission;
             console.log('🔔 Current permission:', permission);
-            
+
             // Request permission if not already granted
             if (permission === 'default' || permission === false) {
               console.log('🔔 Requesting notification permission...');
               const newPermission = await oneSignalInstance.Notifications.requestPermission();
               console.log('🔔 New permission status:', newPermission);
-              
+
               // Wait for permission to be processed and OneSignal to update
               await new Promise(resolve => setTimeout(resolve, 3000));
             }
-            
+
             // Wait for OneSignal to be fully ready
             await oneSignalInstance.User.pushSubscription.optedIn;
-            
+
             // Try to get Player ID using the correct OneSignal SDK methods
             let playerId = null;
-            
+
             // Method 1: Get from User's OneSignal ID
             try {
               playerId = await oneSignalInstance.User.getOneSignalId();
@@ -523,7 +523,7 @@ export default function ChatPage() {
             } catch (method1Error) {
               console.log('⚠️ Method 1 failed:', method1Error);
             }
-            
+
             // Method 2: Get from PushSubscription ID
             if (!playerId) {
               try {
@@ -533,7 +533,7 @@ export default function ChatPage() {
                 console.log('⚠️ Method 2 failed:', method2Error);
               }
             }
-            
+
             // Method 3: Get from User's external ID
             if (!playerId) {
               try {
@@ -543,7 +543,7 @@ export default function ChatPage() {
                 console.log('⚠️ Method 3 failed:', method3Error);
               }
             }
-            
+
             // Method 4: Get from User's email
             if (!playerId) {
               try {
@@ -553,7 +553,7 @@ export default function ChatPage() {
                 console.log('⚠️ Method 4 failed:', method4Error);
               }
             }
-            
+
             if (playerId) {
               console.log('✅ Using OneSignal Player ID:', playerId);
               await saveSubscriptionId(playerId);
@@ -572,7 +572,7 @@ export default function ChatPage() {
       } else {
         console.log('⚠️ OneSignal not available, trying IndexedDB...');
       }
-      
+
       // Fallback to IndexedDB method
       console.log('🗄️ Trying IndexedDB method...');
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
@@ -922,18 +922,18 @@ export default function ChatPage() {
       // Add message to the current conversation if it matches
       if (selectedContact &&
         (message.senderId._id === selectedContact.id || message.receiverId._id === selectedContact.id)) {
-        
+
         // Check if senderId is populated (object) or just an ID (string)
         const senderId = typeof message.senderId === 'object' ? message.senderId._id : message.senderId
         const isCurrentUser = senderId === currentUser.id
-        
+
         console.log(`📝 New message ${message._id}:`, {
           senderId: senderId,
           currentUserId: currentUser.id,
           isCurrentUser: isCurrentUser,
           content: message.content
         })
-        
+
         const newMessage: Message = {
           id: message._id,
           senderId: isCurrentUser ? "me" : senderId,
@@ -1391,29 +1391,29 @@ export default function ChatPage() {
     setIsLoadingMessages(true)
     setMessagesReady(false) // Reset message readiness
     setMessages([]) // Clear existing messages while loading
-    
+
     try {
       const response = await apiCall(`${config.getBackendUrl()}/api/messages/${contactId}`)
       if (response.ok) {
         const messagesData = await response.json()
         console.log('📦 Raw messages data:', messagesData)
         console.log('👤 Current user ID:', currentUser?.id)
-        
+
         // Only process messages if currentUser is available
-        
-        
+
+
         const formattedMessages: Message[] = messagesData.map((msg: any) => {
           // Check if senderId is populated (object) or just an ID (string)
           const senderId = typeof msg.senderId === 'object' ? msg.senderId._id : msg.senderId
           const isCurrentUser = senderId === currentUser.id
-          
+
           console.log(`📝 Message ${msg._id}:`, {
             senderId: senderId,
             currentUserId: currentUser.id,
             isCurrentUser: isCurrentUser,
             content: msg.content
           })
-          
+
           return {
             id: msg._id,
             senderId: isCurrentUser ? "me" : senderId,
@@ -1424,7 +1424,7 @@ export default function ChatPage() {
             fileSize: msg.fileSize,
           }
         })
-        
+
         console.log('✅ Formatted messages:', formattedMessages)
         setMessages(formattedMessages)
         setMessagesReady(true) // Mark messages as ready
@@ -1531,12 +1531,12 @@ export default function ChatPage() {
     if (selectedContact && currentUser) {
       console.log('🔄 Loading messages for contact:', selectedContact.id)
       console.log('👤 Current user available:', currentUser.id)
-      
+
       // Add a small delay to ensure currentUser is fully set
       const timer = setTimeout(() => {
         loadMessages(selectedContact.id)
       }, 100)
-      
+
       return () => clearTimeout(timer)
     }
   }, [selectedContact, currentUser])
@@ -1650,34 +1650,34 @@ export default function ChatPage() {
 
   const forceOneSignalSubscription = async () => {
     console.log('🔧 Force triggering OneSignal subscription...');
-    
+
     try {
       const oneSignalInstance = await initializeOneSignal();
-      
+
       if (!oneSignalInstance) {
         console.error('❌ OneSignal not available for force subscription');
         return;
       }
-      
+
       // Check if push is supported
       const isSupported = await oneSignalInstance.Notifications.isPushSupported();
       console.log('📱 Push supported:', isSupported);
-      
+
       if (!isSupported) {
         console.error('❌ Push notifications not supported');
         return;
       }
-      
+
       // Request permission explicitly
       console.log('🔔 Requesting notification permission...');
       const permission = await oneSignalInstance.Notifications.requestPermission();
       console.log('🔔 Permission result:', permission);
-      
+
       if (permission === 'granted') {
         // Wait for OneSignal to process the subscription
         console.log('⏳ Waiting for OneSignal to create subscription...');
         await new Promise(resolve => setTimeout(resolve, 5000));
-        
+
         // Try to get the subscription ID again
         console.log('🔄 Attempting to get subscription ID after force subscription...');
         await getAndSaveSubscriptionId();
@@ -2040,26 +2040,26 @@ export default function ChatPage() {
 
   const manuallyTriggerOneSignalSubscription = async () => {
     console.log('🔔 Manually triggering OneSignal subscription...');
-    
+
     try {
       // Initialize OneSignal
       const oneSignalInstance = await initializeOneSignal();
-      
+
       if (oneSignalInstance) {
         console.log('✅ OneSignal initialized, showing subscription prompt...');
-        
+
         // Show the subscription prompt
         await oneSignalInstance.showSlidedownPrompt();
         console.log('✅ Subscription prompt shown');
-        
+
         // Wait for user interaction and OneSignal to process
         await new Promise(resolve => setTimeout(resolve, 10000));
-        
+
         // Try to get the Player ID after subscription
         try {
           const playerId = await oneSignalInstance.User.PushSubscription.id;
           console.log('🎯 Player ID after subscription:', playerId);
-          
+
           if (playerId) {
             console.log('✅ Successfully got Player ID, saving to backend...');
             await saveSubscriptionId(playerId);
@@ -2108,7 +2108,7 @@ export default function ChatPage() {
 
 **Note:** Floating notifications are controlled by your device's notification settings, not the website.
     `;
-    
+
     alert(guide);
   };
 
@@ -2118,7 +2118,7 @@ export default function ChatPage() {
     console.log('👤 Current user:', currentUser)
     console.log('📱 Selected contact:', selectedContact)
     console.log('💬 Current messages:', messages)
-    
+
     messages.forEach((msg, index) => {
       console.log(`📝 Message ${index + 1}:`, {
         id: msg.id,
@@ -2212,8 +2212,8 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center space-x-2">
                     {/* Notification Status Indicator */}
-                    
-                    
+
+
                     <Dialog open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen}>
                       <DialogTrigger asChild>
                         <Button
@@ -2295,16 +2295,13 @@ export default function ChatPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        
-                        <DropdownMenuItem onClick={debugMessageSenders}>
-                          <Bug className="h-4 w-4 mr-2" />
-                          Debug Messages
-                        </DropdownMenuItem>
+
+
                         <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
-                        
+
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout
@@ -2713,7 +2710,7 @@ export default function ChatPage() {
               className="hidden"
               onChange={handleImageChange}
             />
-            <Button
+            {/* <Button
               variant="ghost"
               size="sm"
               onClick={handleFileButtonClick}
@@ -2728,7 +2725,7 @@ export default function ChatPage() {
               type="file"
               className="hidden"
               onChange={handleFileChange}
-            />
+            /> */}
             <div className="flex-1 relative">
               <Input
                 ref={messageInputRef}
