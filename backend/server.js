@@ -19,6 +19,7 @@ const { cleanupExpiredSessions } = require('./utils/sessionUtils');
 const app = express();
 const server = http.createServer(app);
 const allowedOrigins = [
+  "http://192.168.0.149:3000"
   "http://localhost:3000",
   "https://t.hous4.com/",
   "https://t.hous4.com",
