@@ -121,19 +121,42 @@ const initializeOneSignal = async () => {
       autoResubscribe: true,
       persistNotification: false,
       // Add proper timeout
-      timeout: 15000
+      timeout: 15000,
+      // Ensure proper subscription setup
+      promptOptions: {
+        slidedown: {
+          prompts: [
+            {
+              type: "push",
+              autoPrompt: true,
+              text: {
+                actionMessage: "We'd like to show you notifications for the latest updates.",
+                acceptButton: "Allow",
+                cancelButton: "Not now"
+              },
+              delay: {
+                pageViews: 1,
+                timeDelay: 20
+              }
+            }
+          ]
+        }
+      }
     });
 
     console.log('✅ OneSignal initialized successfully');
+    
+    // Wait for OneSignal to be fully ready
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Check if user is subscribed
+    const isSubscribed = await OneSignal.User.pushSubscription.optedIn;
+    console.log('📱 User subscription status:', isSubscribed);
+    
     OneSignalInitialized = true;
-    
-    // Wait for OneSignal to fully set up and create IndexedDB structure
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
     return OneSignal;
   } catch (error) {
-    console.error('❌ OneSignal initialization failed:', error);
-    OneSignalInitialized = false;
+    console.error('❌ Error initializing OneSignal:', error);
     return null;
   }
 };
@@ -343,6 +366,43 @@ export default function ChatPage() {
         if (!db.objectStoreNames.contains('subscriptions')) {
           console.error('❌ Subscriptions object store not found in IndexedDB');
           console.log('📋 Available object stores:', Array.from(db.objectStoreNames));
+          
+          // Try to find any object store that might contain subscription data
+          const availableStores = Array.from(db.objectStoreNames);
+          console.log('🔍 Searching through available stores for subscription data...');
+          
+          // Try to find subscription data in other stores
+          for (const storeName of availableStores) {
+            try {
+              const transaction = db.transaction([storeName], 'readonly');
+              const store = transaction.objectStore(storeName);
+              const getAllRequest = store.getAll();
+              
+              getAllRequest.onsuccess = () => {
+                const data = getAllRequest.result;
+                console.log(`📦 Data in ${storeName}:`, data);
+                
+                // Look for any object that might contain a subscription ID
+                if (data && data.length > 0) {
+                  for (const item of data) {
+                    if (item.id || item.subscriptionId || item.playerId || item.onesignalId) {
+                      const foundId = item.id || item.subscriptionId || item.playerId || item.onesignalId;
+                      console.log(`✅ Found potential subscription ID in ${storeName}:`, foundId);
+                      resolve(foundId);
+                      return;
+                    }
+                  }
+                }
+              };
+              
+              getAllRequest.onerror = () => {
+                console.log(`⚠️ Could not read from ${storeName}:`, getAllRequest.error);
+              };
+            } catch (error) {
+              console.log(`⚠️ Error accessing ${storeName}:`, error);
+            }
+          }
+          
           reject('❌ Subscriptions object store not found. Available stores: ' + Array.from(db.objectStoreNames).join(', '));
           return;
         }
@@ -356,13 +416,24 @@ export default function ChatPage() {
             const subs = getAllRequest.result;
             console.log('📦 Retrieved subscriptions from IndexedDB:', subs);
 
-            if (subs && subs.length > 0 && subs[0].id) {
-              console.log('✅ Found subscription ID:', subs[0].id);
-              resolve(subs[0].id); // ✅ Subscription ID (aka Player ID)
+            if (subs && subs.length > 0) {
+              // Look for subscription ID in various possible formats
+              for (const sub of subs) {
+                const subscriptionId = sub.id || sub.subscriptionId || sub.playerId || sub.onesignalId;
+                if (subscriptionId) {
+                  console.log('✅ Found subscription ID:', subscriptionId);
+                  resolve(subscriptionId);
+                  return;
+                }
+              }
+              
+              console.log('⚠️ No valid subscription ID found in subscriptions store');
+              console.log('📋 Available fields in first subscription:', subs[0] ? Object.keys(subs[0]) : 'No data');
             } else {
-              console.log('⚠️ No valid subscription found in IndexedDB');
-              reject('❌ No subscription ID found in IndexedDB');
+              console.log('⚠️ No subscriptions found in IndexedDB');
             }
+            
+            reject('❌ No subscription ID found in IndexedDB');
           };
 
           getAllRequest.onerror = () => {
@@ -404,58 +475,71 @@ export default function ChatPage() {
           console.log('📱 Push supported:', isSubscribed);
           
           if (isSubscribed) {
-            // Request permission if not already granted
+            // Check current permission status
             const permission = await oneSignalInstance.Notifications.permission;
             console.log('🔔 Current permission:', permission);
             
-            if (permission === 'default') {
+            // Request permission if not already granted
+            if (permission === 'default' || permission === false) {
               console.log('🔔 Requesting notification permission...');
-              await oneSignalInstance.Notifications.requestPermission();
-              // Wait for permission to be processed
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              const newPermission = await oneSignalInstance.Notifications.requestPermission();
+              console.log('🔔 New permission status:', newPermission);
+              
+              // Wait for permission to be processed and OneSignal to update
+              await new Promise(resolve => setTimeout(resolve, 3000));
             }
             
-            // Try multiple methods to get Player ID
+            // Wait for OneSignal to be fully ready
+            await oneSignalInstance.User.pushSubscription.optedIn;
+            
+            // Try to get Player ID using the correct OneSignal SDK methods
             let playerId = null;
             
-            // Method 1: Direct Player ID access
+            // Method 1: Get from User's OneSignal ID
             try {
-              playerId = await oneSignalInstance.User.PushSubscription.id;
-              console.log('🎯 Method 1 - Direct Player ID:', playerId);
+              playerId = await oneSignalInstance.User.getOneSignalId();
+              console.log('🎯 Method 1 - User OneSignal ID:', playerId);
             } catch (method1Error) {
               console.log('⚠️ Method 1 failed:', method1Error);
             }
             
-            // Method 2: Get from User object
+            // Method 2: Get from PushSubscription ID
             if (!playerId) {
               try {
-                const user = await oneSignalInstance.User.getOneSignalId();
-                playerId = user;
-                console.log('🎯 Method 2 - User OneSignal ID:', playerId);
+                playerId = await oneSignalInstance.User.pushSubscription.id;
+                console.log('🎯 Method 2 - PushSubscription ID:', playerId);
               } catch (method2Error) {
                 console.log('⚠️ Method 2 failed:', method2Error);
               }
             }
             
-            // Method 3: Get from subscription object
+            // Method 3: Get from User's external ID
             if (!playerId) {
               try {
-                const subscription = await oneSignalInstance.User.PushSubscription.optedIn;
-                if (subscription) {
-                  playerId = await oneSignalInstance.User.PushSubscription.id;
-                  console.log('🎯 Method 3 - Subscription Player ID:', playerId);
-                }
+                playerId = await oneSignalInstance.User.externalId;
+                console.log('🎯 Method 3 - External ID:', playerId);
               } catch (method3Error) {
                 console.log('⚠️ Method 3 failed:', method3Error);
               }
             }
             
+            // Method 4: Get from User's email
+            if (!playerId) {
+              try {
+                playerId = await oneSignalInstance.User.email;
+                console.log('🎯 Method 4 - Email:', playerId);
+              } catch (method4Error) {
+                console.log('⚠️ Method 4 failed:', method4Error);
+              }
+            }
+            
             if (playerId) {
-              console.log('✅ Using OneSignal Player ID');
+              console.log('✅ Using OneSignal Player ID:', playerId);
               await saveSubscriptionId(playerId);
               return;
             } else {
               console.log('⚠️ All OneSignal methods failed to get Player ID');
+              console.log('🔄 Falling back to IndexedDB method...');
             }
           } else {
             console.log('⚠️ Push notifications not supported');
@@ -1482,20 +1566,43 @@ export default function ChatPage() {
   };
 
   const forceOneSignalSubscription = async () => {
-    if (!currentUser?.id) return;
+    console.log('🔧 Force triggering OneSignal subscription...');
+    
     try {
-      // Ensure OneSignal is loaded
-      if (!OneSignal) {
-        const module = await import('react-onesignal');
-        OneSignal = module.default;
+      const oneSignalInstance = await initializeOneSignal();
+      
+      if (!oneSignalInstance) {
+        console.error('❌ OneSignal not available for force subscription');
+        return;
       }
-      console.log('Forcing OneSignal subscription...');
-      await OneSignal.showSlidedownPrompt();
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      await getAndSaveSubscriptionId();
-      console.log('OneSignal subscription forced successfully.');
+      
+      // Check if push is supported
+      const isSupported = await oneSignalInstance.Notifications.isPushSupported();
+      console.log('📱 Push supported:', isSupported);
+      
+      if (!isSupported) {
+        console.error('❌ Push notifications not supported');
+        return;
+      }
+      
+      // Request permission explicitly
+      console.log('🔔 Requesting notification permission...');
+      const permission = await oneSignalInstance.Notifications.requestPermission();
+      console.log('🔔 Permission result:', permission);
+      
+      if (permission === 'granted') {
+        // Wait for OneSignal to process the subscription
+        console.log('⏳ Waiting for OneSignal to create subscription...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Try to get the subscription ID again
+        console.log('🔄 Attempting to get subscription ID after force subscription...');
+        await getAndSaveSubscriptionId();
+      } else {
+        console.error('❌ Permission denied, cannot create subscription');
+      }
     } catch (error) {
-      console.error('Error forcing OneSignal subscription:', error);
+      console.error('❌ Error in force subscription:', error);
     }
   };
 
@@ -1973,6 +2080,17 @@ export default function ChatPage() {
                     <h1 className="text-xl font-semibold">Messages</h1>
                   </div>
                   <div className="flex items-center space-x-2">
+                    {/* Notification Status Indicator */}
+                    <div className="flex items-center space-x-1">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        notifEnabled ? "bg-green-500" : "bg-gray-300"
+                      )} />
+                      <span className="text-xs text-gray-500">
+                        {notifEnabled ? "Notifications" : "No Notifications"}
+                      </span>
+                    </div>
+                    
                     <Dialog open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen}>
                       <DialogTrigger asChild>
                         <Button
@@ -2054,6 +2172,10 @@ export default function ChatPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
+                        <DropdownMenuItem onClick={forceOneSignalSubscription}>
+                          <Bell className="h-4 w-4 mr-2" />
+                          {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                           <User className="h-4 w-4 mr-2" />
                           My Profile
@@ -2298,6 +2420,10 @@ export default function ChatPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
+                    <DropdownMenuItem onClick={forceOneSignalSubscription}>
+                      <Bell className="h-4 w-4 mr-2" />
+                      {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete History
