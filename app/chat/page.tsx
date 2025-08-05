@@ -1400,23 +1400,7 @@ export default function ChatPage() {
         console.log('👤 Current user ID:', currentUser?.id)
         
         // Only process messages if currentUser is available
-        if (!currentUser?.id) {
-          console.log('⚠️ Current user not available, skipping message processing')
-          
-          // Retry after a short delay if this is the first attempt
-          if (retryCount < 3) {
-            console.log(`🔄 Retrying message load in 500ms... (attempt ${retryCount + 1})`)
-            setTimeout(() => {
-              loadMessages(contactId, retryCount + 1)
-            }, 500)
-            return
-          } else {
-            console.log('❌ Max retries reached, giving up')
-            setIsLoadingMessages(false)
-            setMessagesReady(true)
-            return
-          }
-        }
+        
         
         const formattedMessages: Message[] = messagesData.map((msg: any) => {
           // Check if senderId is populated (object) or just an ID (string)
