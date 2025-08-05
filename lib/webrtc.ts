@@ -39,6 +39,16 @@ class WebRTCManager {
   }
 
   constructor(socket: any) {
+    // Ensure we're in a browser environment
+    if (typeof window === 'undefined') {
+      throw new Error('WebRTCManager cannot be initialized on the server side');
+    }
+
+    // Check if WebRTC is supported
+    if (!navigator.mediaDevices) {
+      throw new Error('MediaDevices API is not supported in this browser');
+    }
+
     this.socket = socket
     this.setupSocketListeners()
     this.initializePeerConnection()
@@ -244,6 +254,19 @@ class WebRTCManager {
   // Improved permission and media access with better error handling
   private async getUserMediaWithFallback(audio: boolean, video: boolean): Promise<MediaStream> {
     try {
+      // Check if we're in a browser environment and mediaDevices is available
+      if (typeof window === 'undefined') {
+        throw new Error('WebRTC is not available in server-side environment');
+      }
+
+      if (!navigator.mediaDevices) {
+        throw new Error('MediaDevices API is not supported in this browser. Please use a modern browser with WebRTC support.');
+      }
+
+      if (!navigator.mediaDevices.getUserMedia) {
+        throw new Error('getUserMedia is not supported in this browser. Please use a modern browser with WebRTC support.');
+      }
+
       // First try to get media directly without permission checks
       const constraints: MediaStreamConstraints = {
         audio: audio ? { echoCancellation: true, noiseSuppression: true } : false,
@@ -294,6 +317,32 @@ class WebRTCManager {
   // Simplified device permission check
   async checkDevicePermissions(): Promise<{ audio: boolean; video: boolean; message: string }> {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        return {
+          audio: false,
+          video: false,
+          message: 'WebRTC is not available in server-side environment.'
+        };
+      }
+
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices) {
+        return {
+          audio: false,
+          video: false,
+          message: 'MediaDevices API is not supported in this browser. Please use a modern browser with WebRTC support.'
+        };
+      }
+
+      if (!navigator.mediaDevices.getUserMedia) {
+        return {
+          audio: false,
+          video: false,
+          message: 'getUserMedia is not supported in this browser. Please use a modern browser with WebRTC support.'
+        };
+      }
+
       // Try to get a test stream to check permissions
       const testStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       testStream.getTracks().forEach(track => track.stop());
@@ -339,6 +388,23 @@ class WebRTCManager {
   // Simplified device access test
   async testDeviceAccess(audio: boolean, video: boolean): Promise<boolean> {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        alert('WebRTC is not available in server-side environment');
+        return false;
+      }
+
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices) {
+        alert('MediaDevices API is not supported in this browser. Please use a modern browser with WebRTC support.');
+        return false;
+      }
+
+      if (!navigator.mediaDevices.getUserMedia) {
+        alert('getUserMedia is not supported in this browser. Please use a modern browser with WebRTC support.');
+        return false;
+      }
+
       // Try to get media directly
       const testStream = await navigator.mediaDevices.getUserMedia({
         audio: audio,

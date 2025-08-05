@@ -764,13 +764,37 @@ export default function ChatPage() {
 
       // Initialize WebRTC manager
       if (socket) {
-        const webrtc = new WebRTCManager(socket)
-        setWebrtcManager(webrtc)
+        try {
+          console.log('Initializing WebRTC manager...');
+          
+          // Check if we're in a browser environment
+          if (typeof window === 'undefined') {
+            console.log('Skipping WebRTC initialization on server side');
+            return;
+          }
 
-        // Listen for call state changes
-        webrtc.onStateChange((state) => {
-          setCallState(state)
-        })
+          // Check if WebRTC is supported
+          if (!navigator.mediaDevices) {
+            console.error('MediaDevices API not supported in this browser');
+            return;
+          }
+
+          const webrtc = new WebRTCManager(socket)
+          setWebrtcManager(webrtc)
+
+          // Listen for call state changes
+          webrtc.onStateChange((state) => {
+            console.log('Call state changed:', state);
+            setCallState(state)
+          })
+          
+          console.log('WebRTC manager initialized successfully');
+        } catch (error) {
+          console.error('Failed to initialize WebRTC manager:', error);
+          // Don't throw the error, just log it and continue without WebRTC
+        }
+      } else {
+        console.error('Socket not available for WebRTC initialization');
       }
 
       // Load contacts
@@ -1400,7 +1424,12 @@ export default function ChatPage() {
         console.log('👤 Current user ID:', currentUser?.id)
 
         // Only process messages if currentUser is available
-
+        if (!currentUser) {
+          console.error('Current user not available for message processing');
+          setMessages([]);
+          setMessagesReady(true);
+          return;
+        }
 
         const formattedMessages: Message[] = messagesData.map((msg: any) => {
           // Check if senderId is populated (object) or just an ID (string)
@@ -2130,8 +2159,135 @@ export default function ChatPage() {
     })
   }
 
+  const testCallFunctionality = async () => {
+    console.log('🧪 Testing call functionality...');
+    
+    if (!webrtcManager) {
+      console.error('❌ WebRTC manager not initialized');
+      alert('WebRTC manager not initialized. Please refresh the page.');
+      return;
+    }
+
+    if (!selectedContact) {
+      console.error('❌ No contact selected');
+      alert('Please select a contact first.');
+      return;
+    }
+
+    if (!socketManager.isSocketConnected()) {
+      console.error('❌ Socket not connected');
+      alert('Not connected to server. Please check your connection.');
+      return;
+    }
+
+    console.log('✅ All prerequisites met, testing device access...');
+    
+    try {
+      // Test device permissions
+      const permissions = await webrtcManager.checkDevicePermissions();
+      console.log('📱 Device permissions:', permissions);
+      
+      if (!permissions.audio) {
+        alert('Microphone access required for calls. Please allow microphone access.');
+        return;
+      }
+
+      // Test actual device access
+      console.log('🔍 Testing actual device access...');
+      const audioAccess = await webrtcManager.testDeviceAccess(true, false);
+      console.log('🎤 Audio access test result:', audioAccess);
+      
+      if (!audioAccess) {
+        alert('Failed to access microphone. Please check device permissions and try again.');
+        return;
+      }
+
+      // Test WebRTC connection
+      console.log('🌐 Testing WebRTC connection...');
+      const connectionTest = await webrtcManager.testConnection();
+      console.log('🌐 WebRTC connection test result:', connectionTest);
+
+      // Get diagnostics
+      const diagnostics = webrtcManager.getConnectionDiagnostics();
+      console.log('🔧 WebRTC diagnostics:', diagnostics);
+
+      console.log('✅ All tests passed, ready for calls');
+      alert('Call functionality is ready! You can now make voice or video calls.\n\nDiagnostics:\n' + JSON.stringify(diagnostics, null, 2));
+      
+    } catch (error) {
+      console.error('❌ Error testing call functionality:', error);
+      alert('Error testing call functionality: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  }
+
+  const testSocketConnection = () => {
+    console.log('🧪 Testing socket connection...');
+    
+    const socket = socketManager.getSocket();
+    if (!socket) {
+      alert('Socket not available');
+      return;
+    }
+
+    console.log('Socket connection status:', {
+      connected: socket.connected,
+      id: socket.id
+    });
+
+    // Test sending a simple event
+    socket.emit('test_event', { message: 'Test from client' });
+    
+    alert(`Socket Status:\nConnected: ${socket.connected ? 'Yes' : 'No'}\nID: ${socket.id || 'None'}`);
+  }
+
+  const debugCallError = async () => {
+    console.log('🔍 Debugging call error...');
+    
+    const debugInfo = {
+      webrtcManager: !!webrtcManager,
+      socket: !!socketManager.getSocket(),
+      socketConnected: socketManager.isSocketConnected(),
+      selectedContact: selectedContact?.id,
+      callState: callState,
+      userAgent: navigator.userAgent,
+      webRTCSupported: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      permissions: null as any
+    };
+
+    try {
+      // Test permissions
+      if (webrtcManager) {
+        debugInfo.permissions = await webrtcManager.checkDevicePermissions();
+      }
+    } catch (error) {
+      debugInfo.permissions = { error: error instanceof Error ? error.message : String(error) };
+    }
+
+    console.log('🔍 Call Debug Info:', debugInfo);
+    
+    const debugMessage = `Call Debug Information:
+    
+WebRTC Manager: ${debugInfo.webrtcManager ? '✅ Initialized' : '❌ Not initialized'}
+Socket Available: ${debugInfo.socket ? '✅ Yes' : '❌ No'}
+Socket Connected: ${debugInfo.socketConnected ? '✅ Yes' : '❌ No'}
+Contact Selected: ${debugInfo.selectedContact ? '✅ ' + debugInfo.selectedContact : '❌ No'}
+WebRTC Supported: ${debugInfo.webRTCSupported ? '✅ Yes' : '❌ No'}
+Browser: ${debugInfo.userAgent}
+
+Call State:
+- Incoming: ${callState.isIncoming}
+- Outgoing: ${callState.isOutgoing}
+- Connected: ${callState.isConnected}
+- Local Stream: ${callState.localStream ? '✅ Available' : '❌ None'}
+- Remote Stream: ${callState.remoteStream ? '✅ Available' : '❌ None'}
+
+Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, null, 2) : 'Not tested'}`;
+
+    alert(debugMessage);
+  }
+
   return (
-    <div className="flex h-screen bg-gray-50 relative overflow-hidden">
+    <div className="flex h-screen bg-gray-100 relative overflow-hidden">
       {/* Mobile-specific meta viewport styles */}
       <style jsx global>{`
         @media (max-width: 768px) {
@@ -2151,21 +2307,22 @@ export default function ChatPage() {
             left: 0 !important;
             right: 0 !important;
             z-index: 9999 !important;
-            background: white !important;
-            border-bottom: 1px solid #e5e7eb !important;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important;
+            background: #54a9eb !important;
+            border-bottom: none !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
           }
         }
       `}</style>
+  
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-5 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
-
-      {/* Sidebar */}
+  
+      {/* Sidebar - Telegram Style */}
       <div
         className={cn(
-          "bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out relative",
+          "bg-white flex flex-col transition-all duration-300 ease-in-out relative border-r-0",
           isSidebarOpen
             ? "w-80 fixed md:relative inset-y-0 left-0 md:left-auto z-10"
             : "w-0 md:w-12 overflow-hidden z-20 md:z-auto"
@@ -2185,7 +2342,7 @@ export default function ChatPage() {
         >
           {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
-
+  
         {/* Sidebar Content */}
         <div
           className={cn(
@@ -2195,39 +2352,38 @@ export default function ChatPage() {
         >
           {isSidebarOpen ? (
             <>
-              {/* Header */}
-              <div className="p-4 border-b border-gray-200 pt-16">
+              {/* Telegram-style Header */}
+              <div className="p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white pt-16">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-10 w-10 border-2 border-white/20">
                       <AvatarImage src={currentUser.avatar || "/placeholder.svg"} />
-                      <AvatarFallback>
+                      <AvatarFallback className="bg-white/20 text-white">
                         {currentUser.username
                           .split(" ")
                           .map((n) => n[0])
                           .join("")}
                       </AvatarFallback>
                     </Avatar>
-                    <h1 className="text-xl font-semibold">Messages</h1>
+                    <div>
+                      <h1 className="text-lg font-medium">{currentUser.username}</h1>
+                      <p className="text-xs text-blue-100">online</p>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {/* Notification Status Indicator */}
-
-
                     <Dialog open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen}>
                       <DialogTrigger asChild>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                          className="text-white hover:bg-white/10 p-2"
                         >
-                          <UserPlus className="h-4 w-4 mr-1" />
-                          Add
+                          <UserPlus className="h-5 w-5" />
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
-                          <DialogTitle>Add Friends</DialogTitle>
+                          <DialogTitle>Add New Contact</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
                           <div className="relative">
@@ -2236,11 +2392,11 @@ export default function ChatPage() {
                               placeholder="Search people..."
                               value={friendSearchQuery}
                               onChange={(e) => setFriendSearchQuery(e.target.value)}
-                              className="pl-10"
+                              className="pl-10 border-gray-200 focus:border-blue-500"
                             />
                           </div>
-
-                          {/* Searched Users */}
+  
+                          {/* Search Results */}
                           {friendSearchQuery.trim() && (
                             <div>
                               <h3 className="text-sm font-medium text-gray-700 mb-2">Search Results</h3>
@@ -2252,11 +2408,11 @@ export default function ChatPage() {
                               ) : searchedUsers.length > 0 ? (
                                 <div className="space-y-2">
                                   {searchedUsers.map((user) => (
-                                    <div key={user._id} className="flex items-center justify-between p-2 rounded-lg border">
+                                    <div key={user._id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50">
                                       <div className="flex items-center space-x-3">
-                                        <Avatar className="h-8 w-8">
+                                        <Avatar className="h-10 w-10">
                                           <AvatarImage src="/placeholder.svg" />
-                                          <AvatarFallback>
+                                          <AvatarFallback className="bg-blue-100 text-blue-600">
                                             {user.username
                                               .split(" ")
                                               .map((n) => n[0])
@@ -2268,7 +2424,7 @@ export default function ChatPage() {
                                           <p className="text-xs text-gray-500">{user.email}</p>
                                         </div>
                                       </div>
-                                      <Button size="sm" variant="outline" onClick={() => addFriend(user)}>
+                                      <Button size="sm" className="bg-blue-500 hover:bg-blue-600" onClick={() => addFriend(user)}>
                                         <UserPlus className="h-3 w-3 mr-1" />
                                         Add
                                       </Button>
@@ -2282,26 +2438,21 @@ export default function ChatPage() {
                               )}
                             </div>
                           )}
-
-
                         </div>
                       </DialogContent>
                     </Dialog>
-
+  
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 p-2">
+                          <MoreVertical className="h-5 w-5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-
-
                         <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
-
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout
@@ -2310,20 +2461,22 @@ export default function ChatPage() {
                     </DropdownMenu>
                   </div>
                 </div>
+  
+                {/* Search Bar */}
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 h-4 w-4" />
                   <Input
                     placeholder="Search conversations..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 bg-white/10 border-white/20 text-black placeholder-white/60 focus:bg-white/20 focus:border-white/40"
                   />
                 </div>
               </div>
-
-              {/* Contacts List */}
-              <ScrollArea className="flex-1">
-                <div className="p-2">
+  
+              {/* Contacts List - Telegram Style */}
+              <ScrollArea className="flex-1 bg-white">
+                <div className="p-0">
                   {filteredContacts.map((contact) => (
                     <div
                       key={contact.id}
@@ -2331,14 +2484,14 @@ export default function ChatPage() {
                         setSelectedContact(contact)
                       }}
                       className={cn(
-                        "flex items-center p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors",
-                        selectedContact?.id === contact.id && "bg-blue-50 border border-blue-200",
+                        "flex items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100",
+                        selectedContact?.id === contact.id && "bg-blue-50"
                       )}
                     >
                       <div className="relative">
                         <Avatar className="h-12 w-12">
                           <AvatarImage src={contact.avatar || "/placeholder.svg"} />
-                          <AvatarFallback>
+                          <AvatarFallback className="bg-gray-200 text-gray-600">
                             {contact.name
                               .split(" ")
                               .map((n) => n[0])
@@ -2350,19 +2503,16 @@ export default function ChatPage() {
                         )}
                       </div>
                       <div className="ml-3 flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-1">
                           <p className="text-sm font-medium text-gray-900 truncate">{contact.name}</p>
                           <p className="text-xs text-gray-500">{contact.timestamp}</p>
                         </div>
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-gray-500 truncate">{contact.lastMessage}</p>
                           {contact.unread > 0 && (
-                            <Badge
-                              variant="default"
-                              className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                            >
-                              {contact.unread}
-                            </Badge>
+                            <div className="ml-2 h-5 w-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                              {contact.unread > 9 ? '9+' : contact.unread}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2372,7 +2522,7 @@ export default function ChatPage() {
               </ScrollArea>
             </>
           ) : (
-            // Collapsed sidebar - show only essential buttons
+            // Collapsed sidebar
             <div className="hidden md:flex flex-col items-center py-4 space-y-4 pt-16">
               <Button
                 variant="ghost"
@@ -2381,15 +2531,15 @@ export default function ChatPage() {
                   setIsSidebarOpen(true)
                   setIsAddFriendOpen(true)
                 }}
-                className="p-2 rounded-full"
+                className="p-2 rounded-full hover:bg-gray-100"
                 title="Add Friends"
               >
                 <UserPlus className="h-4 w-4" />
               </Button>
-
+  
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="p-2 rounded-full" title="Menu">
+                  <Button variant="ghost" size="sm" className="p-2 rounded-full hover:bg-gray-100" title="Menu">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -2409,135 +2559,141 @@ export default function ChatPage() {
           )}
         </div>
       </div>
-
-      {/* Main Chat Area */}
+  
+      {/* Main Chat Area - Telegram Style */}
       <div
         ref={chatContainerRef}
         className={cn(
-          "flex-1 flex flex-col bg-white relative",
+          "flex-1 flex flex-col bg-gray-50 relative",
           isSidebarOpen ? "z-0" : "z-10"
         )}
         style={{
           height: isKeyboardVisible && typeof window !== "undefined" && window.visualViewport
             ? `${window.visualViewport?.height || window.innerHeight}px`
             : "100vh",
-          // Mobile-specific height handling
           minHeight: "100vh",
           maxHeight: "100vh",
-          // Add top padding when header is fixed (keyboard visible)
-          paddingTop: isKeyboardVisible ? "80px" : "0px", // Adjust based on header height
         }}
       >
-        {/* Sticky Header - Always visible with conditional z-index */}
-        <div className={cn(
-          "sticky top-0 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95 z-50",
-          isSidebarOpen ? "z-50" : "z-50", // Always high z-index for mobile
-          isKeyboardVisible && "mobile-header-visible" // Add mobile-specific class when keyboard is visible
-        )}
+        {/* Telegram-style Header - Always Visible (Updated) */}
+        <div
+          className={cn(
+            "bg-blue-500 text-white shadow-lg z-50 mobile-header-visible",
+            isKeyboardVisible ? "fixed top-0 left-0 right-0" : "sticky top-0"
+          )}
           style={{
-            // Ensure header stays visible even when keyboard is open
             position: isKeyboardVisible ? 'fixed' : 'sticky',
-            top: isKeyboardVisible ? '0' : '0',
-            left: '0',
+            top: '0',
+            left: isSidebarOpen && !isKeyboardVisible ? '320px' : '0',
             right: '0',
-            zIndex: 9999, // Ensure it's always on top
-          }}>
-          {/* Contact header - Always visible */}
+            zIndex: 9999,
+            transition: 'left 0.3s ease',
+          }}
+        >
           {selectedContact ? (
-            <div className="p-4 flex items-center justify-between flex-shrink-0 border-t border-gray-100 ">
+            <div className="p-3 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={toggleSidebar}
-                  className="p-2 rounded-full hover:bg-gray-100"
+                  className="p-2 rounded-full hover:bg-white/10 text-white md:hidden"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronLeft className="h-5 w-5" />
                 </Button>
-                <Avatar>
+                <Avatar className="h-10 w-10 border-2 border-white/20">
                   <AvatarImage src={selectedContact?.avatar || "/placeholder.svg"} />
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-white/20 text-white">
                     {selectedContact?.name
                       ? selectedContact.name.split(" ").map((n) => n[0]).join("")
                       : "?"}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold">{selectedContact?.name || "No Contact"}</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="font-medium text-white">{selectedContact?.name || "No Contact"}</h3>
+                  <p className="text-xs text-blue-100">
                     {isTyping
-                      ? "Typing..."
+                      ? "typing..."
                       : contactStatus.online
-                        ? "Online"
+                        ? "online"
                         : contactStatus.lastSeen
-                          ? `Last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
-                          : "Offline"}
+                          ? `last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
+                          : "offline"}
+                  </p>
+                  <p className="text-xs text-blue-100">
+                    {socketManager.isSocketConnected() ? "🟢 Connected" : "🔴 Disconnected"}
+                    {webrtcManager ? " | WebRTC Ready" : " | WebRTC Not Ready"}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
                 {/* Voice Call Button */}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="p-2 rounded-full hover:bg-gray-100"
+                  className="p-2 rounded-full hover:bg-white/10 text-white"
                   onClick={async () => {
-                    if (webrtcManager && selectedContact) {
-                      console.log('Starting voice call to:', selectedContact.id);
-                      console.log('Socket status:', socketManager.getConnectionStatus());
-                      console.log('WebRTC manager state:', webrtcManager.getConnectionDiagnostics());
-
-                      const success = await webrtcManager.startVoiceCall(selectedContact.id);
-                      if (!success) {
-                        console.error('Failed to start voice call');
+                    try {
+                      if (webrtcManager && selectedContact) {
+                        console.log('Starting voice call with:', selectedContact.id);
+                        const success = await webrtcManager.startVoiceCall(selectedContact.id);
+                        if (!success) {
+                          console.error('Failed to start voice call');
+                          alert('Failed to start voice call. Please check your microphone permissions and try again.');
+                        } else {
+                          console.log('Voice call initiated successfully');
+                        }
+                      } else {
+                        console.error('WebRTC manager or selected contact not available');
+                        alert('Unable to start call. Please refresh the page and try again.');
                       }
-                    } else {
-                      console.error('Cannot start voice call:', {
-                        webrtcManager: !!webrtcManager,
-                        selectedContact: !!selectedContact,
-                        socketReady: socketManager.isReadyForCalls()
-                      });
+                    } catch (error) {
+                      console.error('Error in voice call handler:', error);
+                      alert('Voice call error: ' + (error instanceof Error ? error.message : String(error)));
                     }
                   }}
-                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || connectionStatus !== 'connected'}
-                  title={connectionStatus !== 'connected' ? "Not connected to server" : "Start voice call"}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected}
+                  title={!webrtcManager ? "WebRTC not initialized" : !selectedContact ? "No contact selected" : "Start voice call"}
                 >
-                  <Phone className="h-4 w-4" />
+                  <Phone className="h-5 w-5" />
                 </Button>
+  
                 {/* Video Call Button */}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="p-2 rounded-full hover:bg-gray-100"
+                  className="p-2 rounded-full hover:bg-white/10 text-white"
                   onClick={async () => {
-                    if (webrtcManager && selectedContact) {
-                      console.log('Starting video call to:', selectedContact.id);
-                      console.log('Socket status:', socketManager.getConnectionStatus());
-                      console.log('WebRTC manager state:', webrtcManager.getConnectionDiagnostics());
-
-                      const success = await webrtcManager.startVideoCall(selectedContact.id);
-                      if (!success) {
-                        console.error('Failed to start video call');
+                    try {
+                      if (webrtcManager && selectedContact) {
+                        console.log('Starting video call with:', selectedContact.id);
+                        const success = await webrtcManager.startVideoCall(selectedContact.id);
+                        if (!success) {
+                          console.error('Failed to start video call');
+                          alert('Failed to start video call. Please check your camera and microphone permissions and try again.');
+                        } else {
+                          console.log('Video call initiated successfully');
+                        }
+                      } else {
+                        console.error('WebRTC manager or selected contact not available');
+                        alert('Unable to start call. Please refresh the page and try again.');
                       }
-                    } else {
-                      console.error('Cannot start video call:', {
-                        webrtcManager: !!webrtcManager,
-                        selectedContact: !!selectedContact,
-                        socketReady: socketManager.isReadyForCalls()
-                      });
+                    } catch (error) {
+                      console.error('Error in video call handler:', error);
+                      alert('Video call error: ' + (error instanceof Error ? error.message : String(error)));
                     }
                   }}
-                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected || connectionStatus !== 'connected'}
-                  title={connectionStatus !== 'connected' ? "Not connected to server" : "Start video call"}
+                  disabled={!webrtcManager || !selectedContact || callState.isIncoming || callState.isOutgoing || callState.isConnected}
+                  title={!webrtcManager ? "WebRTC not initialized" : !selectedContact ? "No contact selected" : "Start video call"}
                 >
-                  <Video className="h-4 w-4" />
+                  <Video className="h-5 w-5" />
                 </Button>
-
+  
                 {/* More Options Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="p-2 rounded-full hover:bg-white/10 text-white">
+                      <MoreVertical className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
@@ -2549,6 +2705,46 @@ export default function ChatPage() {
                       <Bug className="h-4 w-4 mr-2" />
                       Debug Messages
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      console.log('WebRTC Debug Info:', {
+                        webrtcManager: !!webrtcManager,
+                        socket: !!socketManager.getSocket(),
+                        socketConnected: socketManager.isSocketConnected(),
+                        selectedContact: selectedContact?.id,
+                        callState: callState
+                      });
+                      alert('Check console for WebRTC debug info');
+                    }}>
+                      <Bug className="h-4 w-4 mr-2" />
+                      Debug WebRTC
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={testCallFunctionality}>
+                      <Phone className="h-4 w-4 mr-2" />
+                      Test Call Functionality
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={async () => {
+                      if (!webrtcManager) {
+                        alert('WebRTC manager not initialized');
+                        return;
+                      }
+                      try {
+                        const permissions = await webrtcManager.checkDevicePermissions();
+                        alert(`Device permissions:\nAudio: ${permissions.audio ? '✅' : '❌'}\nVideo: ${permissions.video ? '✅' : '❌'}\n\n${permissions.message}`);
+                      } catch (error) {
+                        alert('Error checking permissions: ' + (error instanceof Error ? error.message : String(error)));
+                      }
+                    }}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Check Device Permissions
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={testSocketConnection}>
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Test Socket Connection
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={debugCallError}>
+                      <Bug className="h-4 w-4 mr-2" />
+                      Debug Call Error
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete History
@@ -2558,55 +2754,57 @@ export default function ChatPage() {
               </div>
             </div>
           ) : (
-            <div className="p-4 flex items-center justify-center flex-shrink-0 border-t border-gray-100">
+            <div className="p-4 flex items-center justify-center">
               <div className="text-center">
-                <h3 className="font-semibold text-gray-500">Select a contact to start chatting</h3>
-                <p className="text-sm text-gray-400 mt-1">Choose someone from your contacts list</p>
+                <h3 className="font-medium text-white">Select a chat</h3>
+                <p className="text-xs text-blue-100 mt-1">Choose from your existing conversations</p>
               </div>
             </div>
           )}
         </div>
-
-        {/* Messages - Scrollable area with proper spacing for sticky footer */}
-        <div className="flex-1 overflow-hidden relative">
+  
+        {/* Messages Area - Telegram Style */}
+        <div
+          className="flex-1 overflow-hidden relative"
+          style={{
+            marginTop: isKeyboardVisible ? '64px' : '0', // Account for fixed header
+          }}
+        >
           <ScrollArea
             ref={scrollAreaRef}
-            className={cn(
-              "h-full p-4 pb-24", // Increased bottom padding for mobile
-              isKeyboardVisible && "pt-20" // Add top padding when header is fixed
-            )}
+            className="h-full p-0"
             onScroll={handleScroll}
           >
-            <div className="space-y-4 pb-4">
+            <div className="p-4 space-y-3">
               {isLoadingMessages || !messagesReady ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <Loader2 className="h-6 w-6 animate-spin mr-2 text-blue-500" />
                   <span className="text-sm text-gray-500">
-                    {isLoadingMessages ? "Loading messages..." : "Organizing messages by sender..."}
+                    {isLoadingMessages ? "Loading messages..." : "Organizing messages..."}
                   </span>
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <MessageSquare className="h-8 w-8 text-gray-400" />
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <MessageSquare className="h-10 w-10 text-blue-500" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
                   <p className="text-sm text-gray-500 max-w-sm">
-                    Start a conversation with {selectedContact?.name || 'your contact'} by sending your first message!
+                    Say hello to {selectedContact?.name || 'your contact'} and start your conversation!
                   </p>
                 </div>
               ) : (
                 messages.map((message) => (
                   <div
                     key={message.id}
-                    className={cn("flex mb-4", message.senderId === "me" ? "justify-end" : "justify-start")}
+                    className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
                   >
                     <div
                       className={cn(
-                        "max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm",
+                        "max-w-xs lg:max-w-md px-3 py-2 rounded-2xl shadow-sm relative",
                         message.senderId === "me"
                           ? "bg-blue-500 text-white rounded-br-md"
-                          : "bg-gray-100 text-gray-900 rounded-bl-md border border-gray-200"
+                          : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
                       )}
                     >
                       {message.type === "text" && (
@@ -2624,8 +2822,8 @@ export default function ChatPage() {
                         </div>
                       )}
                       {message.type === "file" && message.content && (
-                        <div className="flex items-center space-x-3 p-3 bg-white bg-opacity-20 rounded-lg">
-                          <File className="h-8 w-8 text-blue-500 flex-shrink-0" />
+                        <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+                          <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
                           <div className="min-w-0 flex-1">
                             <a
                               href={message.content}
@@ -2635,24 +2833,26 @@ export default function ChatPage() {
                             >
                               {message.fileName || 'Download file'}
                             </a>
-                            <p className="text-xs opacity-70 mt-1">{message.fileSize}</p>
+                            <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
                           </div>
                         </div>
                       )}
-                      <p className={cn(
-                        "text-xs mt-2 opacity-70",
-                        message.senderId === "me" ? "text-right" : "text-left"
+                      <div className={cn(
+                        "flex items-center mt-1 space-x-1",
+                        message.senderId === "me" ? "justify-end" : "justify-start"
                       )}>
-                        {message.timestamp}
-                      </p>
+                        <p className="text-xs opacity-70">
+                          {message.timestamp}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
-              <div ref={messagesEndRef} className="h-4" /> {/* Add height to ensure proper scrolling */}
+              <div ref={messagesEndRef} className="h-4" />
             </div>
           </ScrollArea>
-
+  
           {/* Scroll to Bottom Button */}
           {showScrollToBottom && (
             <Button
@@ -2665,43 +2865,38 @@ export default function ChatPage() {
             >
               <ChevronDown className="h-5 w-5" />
               {newMessageCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500">
+                <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   {newMessageCount > 9 ? '9+' : newMessageCount}
-                </Badge>
+                </div>
               )}
             </Button>
           )}
         </div>
-
-        {/* Message Input - Sticky Footer - Always visible */}
+  
+        {/* Telegram-style Message Input - Always Visible */}
         <div
           className={cn(
-            "sticky bottom-0 bg-white border-t border-gray-200 p-4 flex-shrink-0 shadow-lg backdrop-blur-sm bg-white/95 z-50 mobile-safe-area",
-            isSidebarOpen ? "z-50" : "z-50", // Always high z-index for mobile
-            isKeyboardVisible && "mobile-input-focus" // Add mobile-specific class when keyboard is visible
+            "bg-white border-t border-gray-200 p-3 flex-shrink-0 shadow-lg z-50 mobile-safe-area",
+            isKeyboardVisible && "fixed bottom-0 left-0 right-0 mobile-input-focus"
           )}
           style={{
-            // Ensure the input sits directly on top of the keyboard
-            bottom: isKeyboardVisible ? '0' : '0',
-            // Add safe area padding for mobile devices
+            left: isSidebarOpen && !isKeyboardVisible ? '320px' : '0',
+            transition: 'left 0.3s ease',
             paddingBottom: isKeyboardVisible
               ? '8px'
-              : `calc(16px + env(safe-area-inset-bottom, 0px))`,
+              : `calc(12px + env(safe-area-inset-bottom, 0px))`,
           }}
         >
-          {/* Subtle top border indicator */}
-          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 opacity-50"></div>
-
-          <div className="flex items-center space-x-2">
+          <div className="flex items-end space-x-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleImageButtonClick}
               disabled={isUploadingImage}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
               title="Send image"
             >
-              <ImageIcon className="h-4 w-4" />
+              <ImageIcon className="h-5 w-5" />
             </Button>
             <input
               ref={imageInputRef}
@@ -2710,44 +2905,29 @@ export default function ChatPage() {
               className="hidden"
               onChange={handleImageChange}
             />
-            {/* <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleFileButtonClick}
-              disabled={isUploadingImage}
-              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-              title="Send file"
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={handleFileChange}
-            /> */}
+  
             <div className="flex-1 relative">
               <Input
                 ref={messageInputRef}
-                placeholder="Type a message..."
+                placeholder="Message"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && sendMessage()}
                 onFocus={handleInputFocus}
                 onBlur={handleInputBlur}
-                className="pr-20 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="rounded-full border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 px-4 py-2"
                 style={{
-                  fontSize: "16px", // Prevents zoom on iOS
-                  minHeight: "44px", // Better touch target for mobile
+                  fontSize: "16px",
+                  minHeight: "40px",
                   lineHeight: "1.5",
                 }}
-                // Mobile-specific attributes
                 inputMode="text"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="sentences"
               />
             </div>
+  
             <div
               className="flex-shrink-0"
               onMouseDown={(e) => e.preventDefault()}
@@ -2781,7 +2961,8 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
-
+  
+      {/* Keep all your existing modals (Profile, Delete History, Call modals, etc.) */}
       {/* Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <DialogContent className="max-w-md">
@@ -2792,9 +2973,9 @@ export default function ChatPage() {
             {/* Avatar Section */}
             <div className="flex flex-col items-center space-y-4">
               <div className="relative">
-                <Avatar className="h-24 w-24">
+                <Avatar className="h-24 w-24 border-4 border-blue-100">
                   <AvatarImage src={isEditingProfile && editedUser ? editedUser.avatar : currentUser.avatar} />
-                  <AvatarFallback className="text-2xl">
+                  <AvatarFallback className="text-2xl bg-blue-100 text-blue-600">
                     {(isEditingProfile && editedUser ? editedUser.username : currentUser.username)
                       .split(" ")
                       .map((n) => n[0])
@@ -2805,64 +2986,63 @@ export default function ChatPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-transparent"
+                    className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-blue-500 text-white hover:bg-blue-600 border-0"
                     onClick={handleAvatarUpload}
                   >
                     <Camera className="h-4 w-4" />
                   </Button>
                 )}
               </div>
-              {/* Use handleAvatarFileChange for avatar input */}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
             </div>
-
+  
             {/* Profile Information */}
             <div className="space-y-4">
               <div>
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username" className="text-sm font-medium">Username</Label>
                 {isEditingProfile && editedUser ? (
                   <Input
                     id="username"
                     value={editedUser.username}
                     onChange={(e) => setEditedUser({ ...editedUser, username: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 border-gray-200 focus:border-blue-500"
                   />
                 ) : (
-                  <p className="mt-1 text-sm text-gray-600">{currentUser.username}</p>
+                  <p className="mt-1 text-sm text-gray-600 p-2 bg-gray-50 rounded">{currentUser.username}</p>
                 )}
               </div>
-
+  
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 {isEditingProfile && editedUser ? (
                   <Input
                     id="email"
                     type="email"
                     value={editedUser.email}
                     onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 border-gray-200 focus:border-blue-500"
                   />
                 ) : (
-                  <p className="mt-1 text-sm text-gray-600">{currentUser.email}</p>
+                  <p className="mt-1 text-sm text-gray-600 p-2 bg-gray-50 rounded">{currentUser.email}</p>
                 )}
               </div>
-
+  
               <div>
-                <Label htmlFor="bio">Bio</Label>
+                <Label htmlFor="bio" className="text-sm font-medium">Bio</Label>
                 {isEditingProfile && editedUser ? (
                   <Input
                     id="bio"
                     value={editedUser.bio}
                     onChange={(e) => setEditedUser({ ...editedUser, bio: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 border-gray-200 focus:border-blue-500"
                     placeholder="Tell us about yourself..."
                   />
                 ) : (
-                  <p className="mt-1 text-sm text-gray-600">{currentUser.bio}</p>
+                  <p className="mt-1 text-sm text-gray-600 p-2 bg-gray-50 rounded">{currentUser.bio || "No bio added"}</p>
                 )}
               </div>
             </div>
-
+  
             {/* Action Buttons */}
             <div className="flex justify-end space-x-2">
               {isEditingProfile ? (
@@ -2871,13 +3051,13 @@ export default function ChatPage() {
                     <X className="h-4 w-4 mr-2" />
                     Cancel
                   </Button>
-                  <Button onClick={saveProfile}>
+                  <Button onClick={saveProfile} className="bg-blue-500 hover:bg-blue-600">
                     <Save className="h-4 w-4 mr-2" />
                     Save
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => setIsEditingProfile(true)}>
+                <Button onClick={() => setIsEditingProfile(true)} className="bg-blue-500 hover:bg-blue-600">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Profile
                 </Button>
@@ -2886,7 +3066,7 @@ export default function ChatPage() {
           </div>
         </DialogContent>
       </Dialog>
-
+  
       {/* Delete History Confirmation */}
       {showDeleteConfirm && selectedContact && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2906,7 +3086,7 @@ export default function ChatPage() {
           </Card>
         </div>
       )}
-
+  
       {/* Incoming Call Modal */}
       {callState.isIncoming && callState.callData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2948,7 +3128,7 @@ export default function ChatPage() {
           </Card>
         </div>
       )}
-
+  
       {/* Outgoing Call Modal */}
       {callState.isOutgoing && callState.callData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2976,7 +3156,7 @@ export default function ChatPage() {
           </Card>
         </div>
       )}
-
+  
       {/* Voice Call Modal */}
       {callState.isConnected && callState.callData && callState.callData.callType === 'voice' && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
@@ -3028,7 +3208,7 @@ export default function ChatPage() {
           </Card>
         </div>
       )}
-
+  
       {/* Video Call Modal */}
       {callState.isConnected && callState.callData && callState.callData.callType === 'video' && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
@@ -3094,7 +3274,7 @@ export default function ChatPage() {
           </Card>
         </div>
       )}
-
+  
       {/* Image Preview Modal */}
       {previewImage && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onClick={() => setPreviewImage(null)}>
@@ -3111,24 +3291,10 @@ export default function ChatPage() {
           </div>
         </div>
       )}
-
-      {/* Audio Elements for Call Streams - Using refs to prevent re-render issues */}
-      <audio
-        ref={localAudioRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ display: 'none' }}
-      />
-      <audio
-        ref={remoteAudioRef}
-        autoPlay
-        playsInline
-        style={{ display: 'none' }}
-      />
-
-
-
+  
+      {/* Audio Elements for Call Streams */}
+      <audio ref={localAudioRef} autoPlay playsInline muted style={{ display: 'none' }} />
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
     </div>
   )
 }
