@@ -2131,15 +2131,7 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center space-x-2">
                     {/* Notification Status Indicator */}
-                    <div className="flex items-center space-x-1">
-                      <div className={cn(
-                        "w-2 h-2 rounded-full",
-                        notifEnabled ? "bg-green-500" : "bg-gray-300"
-                      )} />
-                      <span className="text-xs text-gray-500">
-                        {notifEnabled ? "Notifications" : "No Notifications"}
-                      </span>
-                    </div>
+                    
                     
                     <Dialog open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen}>
                       <DialogTrigger asChild>
@@ -2222,10 +2214,7 @@ export default function ChatPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={forceOneSignalSubscription}>
-                          <Bell className="h-4 w-4 mr-2" />
-                          {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
-                        </DropdownMenuItem>
+                        
                         <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                           <User className="h-4 w-4 mr-2" />
                           My Profile
