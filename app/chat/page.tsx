@@ -302,7 +302,7 @@ export default function ChatPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [editedUser, setEditedUser] = useState<CurrentUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const sendButtonRef = useRef<HTMLButtonElement>(null);
   const isSendButtonClickedRef = useRef(false);
