@@ -341,6 +341,12 @@ export default function ChatPage() {
   const [lastSeen, setLastSeen] = useState<number | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
 
+  // 🔥 NEW: Add reconnection handling state
+  const [showReconnectPopup, setShowReconnectPopup] = useState(false);
+  const [lastActivityTime, setLastActivityTime] = useState<number>(Date.now());
+  const [wasOffline, setWasOffline] = useState(false);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // All refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1081,10 +1087,10 @@ export default function ChatPage() {
       setIsOnline(true);
       setConnectionStatus('connected');
       
-      // 🔥 ADD THIS: Reload messages when browser comes back online
-      if (selectedContact && currentUser) {
-        console.log('🔄 Reloading messages after browser reconnection...');
-        loadMessages(selectedContact.id);
+      // 🔥 ENHANCED: Mark that user was offline and trigger reconnection
+      if (wasOffline) {
+        console.log('🔄 User was offline, triggering reconnection...');
+        handleReconnection();
       }
     };
 
@@ -1093,6 +1099,7 @@ export default function ChatPage() {
       setIsOnline(false);
       setConnectionStatus('disconnected');
       setLastSeen(Date.now());
+      setWasOffline(true);
     };
 
     // Listen for online/offline events
@@ -1107,7 +1114,7 @@ export default function ChatPage() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [selectedContact, currentUser]); // 🔥 ADD selectedContact and currentUser to dependencies
+  }, [selectedContact, currentUser, wasOffline]); // 🔥 ADD wasOffline to dependencies
 
   // Track socket connection status
   useEffect(() => {
@@ -1118,10 +1125,10 @@ export default function ChatPage() {
       console.log('🔌 Socket connected');
       setConnectionStatus('connected');
       
-      // 🔥 ADD THIS: Reload messages when user comes back online
-      if (selectedContact && currentUser) {
-        console.log('🔄 Reloading messages after reconnection...');
-        loadMessages(selectedContact.id);
+      // 🔥 ENHANCED: If user was offline, trigger reconnection
+      if (wasOffline) {
+        console.log('🔌 Socket reconnected after being offline, triggering reconnection...');
+        handleReconnection();
       }
     };
 
@@ -1129,6 +1136,7 @@ export default function ChatPage() {
       console.log('🔌 Socket disconnected');
       setConnectionStatus('disconnected');
       setLastSeen(Date.now());
+      setWasOffline(true);
     };
 
     const handleConnecting = () => {
@@ -1148,7 +1156,72 @@ export default function ChatPage() {
       socket.off('disconnect', handleDisconnect);
       socket.off('connecting', handleConnecting);
     };
-  }, [socketManager, selectedContact, currentUser]); // 🔥 ADD selectedContact and currentUser to dependencies
+  }, [socketManager, selectedContact, currentUser, wasOffline]); // 🔥 ADD wasOffline to dependencies
+
+  // 🔥 NEW: Enhanced reconnection handling
+  const handleReconnection = async () => {
+    console.log('🔄 Handling reconnection...');
+    
+    if (selectedContact && currentUser) {
+      try {
+        console.log('📡 Fetching messages after reconnection...');
+        await loadMessages(selectedContact.id);
+        setWasOffline(false);
+        setShowReconnectPopup(false);
+      } catch (error) {
+        console.error('❌ Failed to reload messages after reconnection:', error);
+        // Show popup as fallback
+        setShowReconnectPopup(true);
+      }
+    }
+  };
+
+  // 🔥 NEW: Activity tracking
+  const updateActivityTime = () => {
+    setLastActivityTime(Date.now());
+  };
+
+  // 🔥 NEW: Check for inactivity and trigger reconnection
+  const checkInactivityAndReconnect = () => {
+    const now = Date.now();
+    const inactiveThreshold = 5 * 60 * 1000; // 5 minutes
+    
+    if (wasOffline && (now - lastActivityTime) > inactiveThreshold) {
+      console.log('⏰ User returned from inactivity, triggering reconnection...');
+      handleReconnection();
+    }
+  };
+
+  // 🔥 NEW: Activity tracking useEffect
+  useEffect(() => {
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const handleActivity = () => {
+      updateActivityTime();
+      checkInactivityAndReconnect();
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+    };
+  }, [wasOffline, lastActivityTime]); // Add dependencies
+
+  // 🔥 NEW: Periodic reconnection check
+  useEffect(() => {
+    if (wasOffline) {
+      const interval = setInterval(() => {
+        checkInactivityAndReconnect();
+      }, 30000); // Check every 30 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [wasOffline, lastActivityTime]);
 
   // Function to check if user should receive notifications (offline for more than 5 minutes)
   const shouldSendOfflineNotification = (lastSeenTime: number) => {
@@ -2298,6 +2371,49 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
     alert(debugMessage);
   }
 
+  // 🔥 NEW: Reconnection popup component
+  const ReconnectionPopup = () => {
+    if (!showReconnectPopup) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center">
+          <div className="mb-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Connection Restored</h3>
+            <p className="text-gray-600 mb-4">
+              You were offline. Some messages might not be visible. Would you like to refresh to see all messages?
+            </p>
+          </div>
+          <div className="flex space-x-3">
+            <button
+              onClick={() => {
+                setShowReconnectPopup(false);
+                handleReconnection();
+              }}
+              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Refresh Messages
+            </button>
+            <button
+              onClick={() => {
+                setShowReconnectPopup(false);
+                window.location.reload();
+              }}
+              className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen bg-gray-100 relative overflow-hidden">
       {/* Mobile-specific meta viewport styles */}
@@ -3285,6 +3401,9 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
       {/* Audio Elements for Call Streams */}
       <audio ref={localAudioRef} autoPlay playsInline muted style={{ display: 'none' }} />
       <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+
+      {/* 🔥 NEW: Reconnection Popup */}
+      <ReconnectionPopup />
     </div>
   )
 }
