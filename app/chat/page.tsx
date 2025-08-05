@@ -2328,11 +2328,14 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
       {/* Sidebar - Telegram Style */}
       <div
         className={cn(
-          "bg-blue-500 flex flex-col transition-all duration-300 ease-in-out relative border-r-0",
+          "flex flex-col transition-all duration-300 ease-in-out relative border-r-0",
           isSidebarOpen
             ? "w-80 fixed md:relative inset-y-0 left-0 md:left-auto z-10"
             : "w-0 md:w-12 overflow-hidden z-20 md:z-auto"
         )}
+        style={{
+          backgroundColor: '#54a9eb'
+        }}
       >
         {/* Sidebar Toggle Button */}
         <Button
