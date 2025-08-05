@@ -2359,7 +2359,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           {isSidebarOpen ? (
             <>
               {/* Telegram-style Header */}
-              <div className="p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white pt-16">
+              <div className="p-4 bg-gradient-to-r from-blue-500 to-blue-500 text-white pt-16">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border-2 border-white/20">
