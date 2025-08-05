@@ -921,12 +921,24 @@ export default function ChatPage() {
       // Add message to the current conversation if it matches
       if (selectedContact &&
         (message.senderId._id === selectedContact.id || message.receiverId._id === selectedContact.id)) {
+        
+        // Check if senderId is populated (object) or just an ID (string)
+        const senderId = typeof message.senderId === 'object' ? message.senderId._id : message.senderId
+        const isCurrentUser = senderId === currentUser.id
+        
+        console.log(`📝 New message ${message._id}:`, {
+          senderId: senderId,
+          currentUserId: currentUser.id,
+          isCurrentUser: isCurrentUser,
+          content: message.content
+        })
+        
         const newMessage: Message = {
           id: message._id,
-          senderId: message.senderId._id === currentUser.id ? "me" : message.senderId._id,
+          senderId: isCurrentUser ? "me" : senderId,
           content: message.content,
           timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-          type: message.type,
+          type: message.type || "text",
           fileName: message.fileName,
           fileSize: message.fileSize,
         }
@@ -935,7 +947,8 @@ export default function ChatPage() {
 
       // Update contact's last message
       setUserContacts(prev => prev.map(contact => {
-        if (contact.id === message.senderId._id) {
+        const senderId = typeof message.senderId === 'object' ? message.senderId._id : message.senderId
+        if (contact.id === senderId) {
           return {
             ...contact,
             lastMessage: message.content,
@@ -1379,15 +1392,33 @@ export default function ChatPage() {
       const response = await apiCall(`${config.getBackendUrl()}/api/messages/${contactId}`)
       if (response.ok) {
         const messagesData = await response.json()
-        const formattedMessages: Message[] = messagesData.map((msg: any) => ({
-          id: msg._id,
-          senderId: msg.senderId._id === currentUser?.id ? "me" : msg.senderId._id,
-          content: msg.content,
-          timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-          type: msg.type,
-          fileName: msg.fileName,
-          fileSize: msg.fileSize,
-        }))
+        console.log('📦 Raw messages data:', messagesData)
+        console.log('👤 Current user ID:', currentUser?.id)
+        
+        const formattedMessages: Message[] = messagesData.map((msg: any) => {
+          // Check if senderId is populated (object) or just an ID (string)
+          const senderId = typeof msg.senderId === 'object' ? msg.senderId._id : msg.senderId
+          const isCurrentUser = senderId === currentUser?.id
+          
+          console.log(`📝 Message ${msg._id}:`, {
+            senderId: senderId,
+            currentUserId: currentUser?.id,
+            isCurrentUser: isCurrentUser,
+            content: msg.content
+          })
+          
+          return {
+            id: msg._id,
+            senderId: isCurrentUser ? "me" : senderId,
+            content: msg.content,
+            timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+            type: msg.type || "text",
+            fileName: msg.fileName,
+            fileSize: msg.fileSize,
+          }
+        })
+        
+        console.log('✅ Formatted messages:', formattedMessages)
         setMessages(formattedMessages)
       } else {
         console.error('Failed to load messages')
@@ -1484,6 +1515,22 @@ export default function ChatPage() {
       }, 300);
     }
   }, [selectedContact?.id]);
+
+  // Load messages when selected contact changes
+  useEffect(() => {
+    if (selectedContact && currentUser) {
+      console.log('🔄 Loading messages for contact:', selectedContact.id)
+      console.log('👤 Current user available:', currentUser.id)
+      loadMessages(selectedContact.id)
+    }
+  }, [selectedContact, currentUser])
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages])
 
   // Early return for loading state must come after all hooks
   if (isLoading || !currentUser) {
@@ -2049,6 +2096,24 @@ export default function ChatPage() {
     alert(guide);
   };
 
+  // Add this function after loadMessages
+  const debugMessageSenders = () => {
+    console.log('🔍 Debugging message senders...')
+    console.log('👤 Current user:', currentUser)
+    console.log('📱 Selected contact:', selectedContact)
+    console.log('💬 Current messages:', messages)
+    
+    messages.forEach((msg, index) => {
+      console.log(`📝 Message ${index + 1}:`, {
+        id: msg.id,
+        senderId: msg.senderId,
+        content: msg.content,
+        isFromMe: msg.senderId === "me",
+        shouldBeRight: msg.senderId === "me"
+      })
+    })
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 relative overflow-hidden">
       {/* Mobile-specific meta viewport styles */}
@@ -2215,6 +2280,10 @@ export default function ChatPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
                         
+                        <DropdownMenuItem onClick={debugMessageSenders}>
+                          <Bug className="h-4 w-4 mr-2" />
+                          Debug Messages
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
                           <User className="h-4 w-4 mr-2" />
                           My Profile
@@ -2462,6 +2531,10 @@ export default function ChatPage() {
                     <DropdownMenuItem onClick={forceOneSignalSubscription}>
                       <Bell className="h-4 w-4 mr-2" />
                       {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={debugMessageSenders}>
+                      <Bug className="h-4 w-4 mr-2" />
+                      Debug Messages
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="h-4 w-4 mr-2" />
