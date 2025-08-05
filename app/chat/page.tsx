@@ -2311,6 +2311,12 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
             border-bottom: none !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
           }
+          .mobile-keyboard-open {
+            padding-bottom: 120px !important;
+          }
+          .mobile-messages-container {
+            height: calc(100vh - 120px) !important;
+          }
         }
       `}</style>
   
@@ -2322,7 +2328,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
       {/* Sidebar - Telegram Style */}
       <div
         className={cn(
-          "bg-white flex flex-col transition-all duration-300 ease-in-out relative border-r-0",
+          "bg-blue-500 flex flex-col transition-all duration-300 ease-in-out relative border-r-0",
           isSidebarOpen
             ? "w-80 fixed md:relative inset-y-0 left-0 md:left-auto z-10"
             : "w-0 md:w-12 overflow-hidden z-20 md:z-auto"
@@ -2620,10 +2626,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           ? `last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
                           : "offline"}
                   </p>
-                  <p className="text-xs text-blue-100">
-                    {socketManager.isSocketConnected() ? "🟢 Connected" : "🔴 Disconnected"}
-                    {webrtcManager ? " | WebRTC Ready" : " | WebRTC Not Ready"}
-                  </p>
+                
                 </div>
               </div>
               <div className="flex items-center space-x-1">
@@ -2697,54 +2700,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={forceOneSignalSubscription}>
-                      <Bell className="h-4 w-4 mr-2" />
-                      {notifEnabled ? 'Notifications Enabled' : 'Enable Notifications'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={debugMessageSenders}>
-                      <Bug className="h-4 w-4 mr-2" />
-                      Debug Messages
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      console.log('WebRTC Debug Info:', {
-                        webrtcManager: !!webrtcManager,
-                        socket: !!socketManager.getSocket(),
-                        socketConnected: socketManager.isSocketConnected(),
-                        selectedContact: selectedContact?.id,
-                        callState: callState
-                      });
-                      alert('Check console for WebRTC debug info');
-                    }}>
-                      <Bug className="h-4 w-4 mr-2" />
-                      Debug WebRTC
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={testCallFunctionality}>
-                      <Phone className="h-4 w-4 mr-2" />
-                      Test Call Functionality
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={async () => {
-                      if (!webrtcManager) {
-                        alert('WebRTC manager not initialized');
-                        return;
-                      }
-                      try {
-                        const permissions = await webrtcManager.checkDevicePermissions();
-                        alert(`Device permissions:\nAudio: ${permissions.audio ? '✅' : '❌'}\nVideo: ${permissions.video ? '✅' : '❌'}\n\n${permissions.message}`);
-                      } catch (error) {
-                        alert('Error checking permissions: ' + (error instanceof Error ? error.message : String(error)));
-                      }
-                    }}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Check Device Permissions
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={testSocketConnection}>
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Test Socket Connection
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={debugCallError}>
-                      <Bug className="h-4 w-4 mr-2" />
-                      Debug Call Error
-                    </DropdownMenuItem>
+                   
                     <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete History
@@ -2768,14 +2724,21 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           className="flex-1 overflow-hidden relative"
           style={{
             marginTop: isKeyboardVisible ? '64px' : '0', // Account for fixed header
+            paddingBottom: isKeyboardVisible ? '120px' : '0', // Add padding when keyboard is visible
           }}
         >
           <ScrollArea
             ref={scrollAreaRef}
-            className="h-full p-0"
+            className={cn(
+              "h-full p-0",
+              isKeyboardVisible && "mobile-messages-container"
+            )}
             onScroll={handleScroll}
           >
-            <div className="p-4 space-y-3">
+            <div className={cn(
+              "p-4 space-y-3",
+              isKeyboardVisible && "pb-20"
+            )}>
               {isLoadingMessages || !messagesReady ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mr-2 text-blue-500" />
