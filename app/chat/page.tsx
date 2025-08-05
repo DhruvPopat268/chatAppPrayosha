@@ -310,6 +310,7 @@ export default function ChatPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [userContacts, setUserContacts] = useState<Contact[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [messagesReady, setMessagesReady] = useState(false) // Track if messages are properly organized
   const [webrtcManager, setWebrtcManager] = useState<any>(null)
   const [callState, setCallState] = useState<CallState>({
     isIncoming: false,
@@ -1386,8 +1387,11 @@ export default function ChatPage() {
   }
 
   // Load messages for a contact
-  const loadMessages = async (contactId: string) => {
+  const loadMessages = async (contactId: string, retryCount = 0) => {
     setIsLoadingMessages(true)
+    setMessagesReady(false) // Reset message readiness
+    setMessages([]) // Clear existing messages while loading
+    
     try {
       const response = await apiCall(`${config.getBackendUrl()}/api/messages/${contactId}`)
       if (response.ok) {
@@ -1395,14 +1399,33 @@ export default function ChatPage() {
         console.log('📦 Raw messages data:', messagesData)
         console.log('👤 Current user ID:', currentUser?.id)
         
+        // Only process messages if currentUser is available
+        if (!currentUser?.id) {
+          console.log('⚠️ Current user not available, skipping message processing')
+          
+          // Retry after a short delay if this is the first attempt
+          if (retryCount < 3) {
+            console.log(`🔄 Retrying message load in 500ms... (attempt ${retryCount + 1})`)
+            setTimeout(() => {
+              loadMessages(contactId, retryCount + 1)
+            }, 500)
+            return
+          } else {
+            console.log('❌ Max retries reached, giving up')
+            setIsLoadingMessages(false)
+            setMessagesReady(true)
+            return
+          }
+        }
+        
         const formattedMessages: Message[] = messagesData.map((msg: any) => {
           // Check if senderId is populated (object) or just an ID (string)
           const senderId = typeof msg.senderId === 'object' ? msg.senderId._id : msg.senderId
-          const isCurrentUser = senderId === currentUser?.id
+          const isCurrentUser = senderId === currentUser.id
           
           console.log(`📝 Message ${msg._id}:`, {
             senderId: senderId,
-            currentUserId: currentUser?.id,
+            currentUserId: currentUser.id,
             isCurrentUser: isCurrentUser,
             content: msg.content
           })
@@ -1420,13 +1443,16 @@ export default function ChatPage() {
         
         console.log('✅ Formatted messages:', formattedMessages)
         setMessages(formattedMessages)
+        setMessagesReady(true) // Mark messages as ready
       } else {
         console.error('Failed to load messages')
         setMessages([])
+        setMessagesReady(true) // Mark as ready even if empty
       }
     } catch (error) {
       console.error('Error loading messages:', error)
       setMessages([])
+      setMessagesReady(true) // Mark as ready even if error
     } finally {
       setIsLoadingMessages(false)
     }
@@ -1521,7 +1547,13 @@ export default function ChatPage() {
     if (selectedContact && currentUser) {
       console.log('🔄 Loading messages for contact:', selectedContact.id)
       console.log('👤 Current user available:', currentUser.id)
-      loadMessages(selectedContact.id)
+      
+      // Add a small delay to ensure currentUser is fully set
+      const timer = setTimeout(() => {
+        loadMessages(selectedContact.id)
+      }, 100)
+      
+      return () => clearTimeout(timer)
     }
   }, [selectedContact, currentUser])
 
@@ -2565,10 +2597,12 @@ export default function ChatPage() {
             onScroll={handleScroll}
           >
             <div className="space-y-4 pb-4">
-              {isLoadingMessages ? (
+              {isLoadingMessages || !messagesReady ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  <span className="text-sm text-gray-500">Loading messages...</span>
+                  <span className="text-sm text-gray-500">
+                    {isLoadingMessages ? "Loading messages..." : "Organizing messages by sender..."}
+                  </span>
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
