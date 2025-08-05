@@ -371,6 +371,40 @@ export default function TestPage() {
                   <Bug className="h-4 w-4 mr-2" />
                   Force Subscription
                 </Button>
+                <Button 
+                  onClick={() => {
+                    const guide = `
+🔔 **Notification Display Settings**
+
+**To get floating/heads-up notifications like WhatsApp:**
+
+**Chrome/Edge:**
+1. Go to Settings → Privacy and Security → Site Settings → Notifications
+2. Find your site and click "Edit"
+3. Change from "Show notifications" to "Show notifications (including sound)"
+4. Enable "Show notifications even when the site is closed"
+
+**Firefox:**
+1. Go to Settings → Privacy & Security → Permissions → Notifications
+2. Click "Settings" next to your site
+3. Select "Allow" and check "Show notifications even when Firefox is closed"
+
+**Mobile Chrome:**
+1. Go to Settings → Site Settings → Notifications
+2. Find your site and enable "Show notifications"
+3. In Android Settings → Apps → Chrome → Notifications
+4. Enable "Show notifications" and "Allow notification dot"
+
+**Note:** Floating notifications are controlled by your device's notification settings, not the website.
+                    `;
+                    alert(guide);
+                  }} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Notification Settings Guide
+                </Button>
               </div>
             </div>
           </CardContent>

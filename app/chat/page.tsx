@@ -141,6 +141,26 @@ const initializeOneSignal = async () => {
             }
           ]
         }
+      },
+      // Enhanced notification settings for better display
+      notificationClickHandlerMatch: 'origin',
+      notificationClickHandlerAction: 'focus',
+      // Enable sound and vibration for better notification visibility
+      notificationLaunchUrl: window.location.origin,
+      // Configure for better mobile experience
+      safari_web_id: process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID,
+      // Enable native prompts for better permission handling
+      native_prompt_enabled: true,
+      // Configure notification display
+      notificationDisplayOptions: {
+        // Enable sound for notifications
+        sound: true,
+        // Enable vibration
+        vibration: true,
+        // Show notification even when app is in focus
+        showWhenInFocus: true,
+        // Enable notification badges
+        badge: true
       }
     });
 
@@ -1997,6 +2017,36 @@ export default function ChatPage() {
       console.error('❌ Error triggering OneSignal subscription:', error);
       alert('Error triggering OneSignal subscription: ' + (error instanceof Error ? error.message : String(error)));
     }
+  };
+
+  // Add this function after forceOneSignalSubscription
+  const showNotificationSettingsGuide = () => {
+    const guide = `
+🔔 **Notification Display Settings**
+
+**To get floating/heads-up notifications like WhatsApp:**
+
+**Chrome/Edge:**
+1. Go to Settings → Privacy and Security → Site Settings → Notifications
+2. Find your site and click "Edit"
+3. Change from "Show notifications" to "Show notifications (including sound)"
+4. Enable "Show notifications even when the site is closed"
+
+**Firefox:**
+1. Go to Settings → Privacy & Security → Permissions → Notifications
+2. Click "Settings" next to your site
+3. Select "Allow" and check "Show notifications even when Firefox is closed"
+
+**Mobile Chrome:**
+1. Go to Settings → Site Settings → Notifications
+2. Find your site and enable "Show notifications"
+3. In Android Settings → Apps → Chrome → Notifications
+4. Enable "Show notifications" and "Allow notification dot"
+
+**Note:** Floating notifications are controlled by your device's notification settings, not the website.
+    `;
+    
+    alert(guide);
   };
 
   return (

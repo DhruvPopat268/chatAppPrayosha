@@ -1,87 +1,104 @@
-# Web Push Notification Setup Guide
+# Notification Setup Guide
 
-## Prerequisites
+## Getting Floating/Heads-up Notifications Like WhatsApp
 
-1. **OneSignal Account**: Sign up at [OneSignal.com](https://onesignal.com)
-2. **HTTPS or Localhost**: Push notifications require HTTPS (except for localhost)
+Unfortunately, **floating/heads-up notifications are not supported in web push notifications**. This is a limitation of the Web Push API and browser security model. However, you can configure your browser and device settings to get the best possible notification experience.
 
-## Environment Variables Setup
+## Browser Configuration
 
-### Backend (.env file in backend directory)
-```env
-ONESIGNAL_APP_ID=your_onesignal_app_id_here
-ONESIGNAL_REST_API_KEY=your_onesignal_rest_api_key_here
+### Chrome/Edge (Desktop)
+1. Go to `Settings` → `Privacy and Security` → `Site Settings` → `Notifications`
+2. Find your site and click `Edit`
+3. Change from "Show notifications" to **"Show notifications (including sound)"**
+4. Enable **"Show notifications even when the site is closed"**
+
+### Firefox (Desktop)
+1. Go to `Settings` → `Privacy & Security` → `Permissions` → `Notifications`
+2. Click `Settings` next to your site
+3. Select `Allow` and check **"Show notifications even when Firefox is closed"**
+
+### Mobile Chrome
+1. Go to `Settings` → `Site Settings` → `Notifications`
+2. Find your site and enable `Show notifications`
+3. In Android `Settings` → `Apps` → `Chrome` → `Notifications`
+4. Enable **"Show notifications"** and **"Allow notification dot"**
+
+## Device Settings
+
+### Android
+1. Go to `Settings` → `Apps` → `Chrome` → `Notifications`
+2. Enable **"Show notifications"**
+3. Enable **"Allow notification dot"**
+4. Set **"Importance"** to `High` or `Urgent`
+5. Enable **"Show on lock screen"**
+
+### iOS
+1. Go to `Settings` → `Safari` → `Notifications`
+2. Enable **"Allow Notifications"**
+3. Enable **"Show on Lock Screen"**
+4. Enable **"Show in History"**
+
+## OneSignal Configuration
+
+The app is configured with the following settings for optimal notification display:
+
+```javascript
+{
+  // Enable sound and vibration
+  sound: true,
+  vibration: true,
+  
+  // Show notification even when app is in focus
+  showWhenInFocus: true,
+  
+  // Enable notification badges
+  badge: true,
+  
+  // Enable native prompts
+  native_prompt_enabled: true
+}
 ```
 
-### Frontend (.env.local file in root directory)
-```env
-NEXT_PUBLIC_ONESIGNAL_APP_ID=your_onesignal_app_id_here
-```
+## Alternative Solutions
 
-## OneSignal Dashboard Setup
+### 1. Progressive Web App (PWA)
+Consider converting your web app to a PWA to get more native-like notification behavior.
 
-1. **Create a new app** in OneSignal dashboard
-2. **Choose Web Push** as the platform
-3. **Configure your website**:
-   - Site Name: Your app name
-   - Site URL: Your domain (or localhost for development)
-   - Default Notification Icon: Upload your app icon
-4. **Get your credentials**:
-   - App ID: Copy from the dashboard
-   - REST API Key: Copy from Settings > Keys & IDs
+### 2. Mobile App
+For true floating notifications like WhatsApp, you would need to build a native mobile app.
 
-## Service Worker Configuration
-
-The app uses OneSignal's service worker. Make sure these files exist:
-- `/public/OneSignalSDKWorker.js` - OneSignal's service worker
-- `/public/sw.js` - Custom service worker (handles additional features)
+### 3. Desktop App
+Using Electron or similar frameworks can provide more control over notification display.
 
 ## Testing Notifications
 
-1. **Enable notifications** in your browser
-2. **Use the debug menu** in the chat app:
-   - "Test Notification" - Sends a test notification
-   - "Check Notification Status" - Shows configuration status
-3. **Check browser console** for detailed logs
+Use the `/test` page to:
+1. Test OneSignal initialization
+2. Force subscription
+3. Check notification settings
+4. View detailed logs
 
 ## Troubleshooting
 
-### Common Issues:
+### Notifications not showing
+1. Check browser notification permissions
+2. Ensure OneSignal is properly initialized
+3. Check device notification settings
+4. Verify subscription ID is saved to backend
 
-1. **"OneSignal environment variables not configured"**
-   - Check that ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY are set in backend .env
+### Notifications only in tray
+This is normal for web push notifications. Floating notifications require native app capabilities.
 
-2. **"No OneSignal playerId found for user"**
-   - User hasn't granted notification permission
-   - OneSignal initialization failed
-   - Check browser console for errors
+## Important Notes
 
-3. **"All included players are not subscribed"**
-   - Player ID is invalid or expired
-   - User revoked notification permission
-   - OneSignal configuration is incorrect
+- **Web push notifications are designed to be non-intrusive** for user privacy
+- **Floating notifications are a native OS feature**, not available in web browsers
+- **Notification display is controlled by the user's device settings**
+- **The best experience comes from proper browser/device configuration**
 
-4. **Notifications not showing**
-   - Check browser notification settings
-   - Ensure HTTPS is used (except localhost)
-   - Verify service worker is registered
+## Current Status
 
-### Debug Endpoints:
-
-- `GET /api/debug/onesignal-config` - Check OneSignal configuration
-- `GET /api/debug/onesignal-users` - List users with player IDs
-- `GET /api/debug/validate-onesignal-user/:userId` - Validate specific user
-- `POST /api/debug/test-notification/:userId` - Send test notification
-
-## Browser Compatibility
-
-- Chrome 42+
-- Firefox 44+
-- Safari 16+ (macOS 13+)
-- Edge 17+
-
-## Security Notes
-
-- Keep your REST API key secure
-- Use HTTPS in production
-- Validate user permissions before sending notifications 
+✅ **Working**: Push notifications in notification tray  
+❌ **Not Supported**: Floating/heads-up notifications  
+✅ **Configurable**: Sound, vibration, and notification badges  
+✅ **Available**: Notification settings guide in test page 
