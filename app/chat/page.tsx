@@ -2307,7 +2307,6 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
             left: 0 !important;
             right: 0 !important;
             z-index: 9999 !important;
-            background: #54a9eb !important;
             border-bottom: none !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
           }
@@ -2362,7 +2361,10 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           {isSidebarOpen ? (
             <>
               {/* Telegram-style Header */}
-              <div className="p-4 bg-gradient-to-r from-blue-500 to-blue-500 text-white pt-16">
+              <div 
+                className="p-4 text-white pt-16"
+                style={{ backgroundColor: '#54a9eb' }}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border-2 border-white/20">
@@ -2587,7 +2589,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
         {/* Telegram-style Header - Always Visible (Updated) */}
         <div
           className={cn(
-            "bg-blue-500 text-white shadow-lg z-50 mobile-header-visible",
+            "text-white shadow-lg z-50 mobile-header-visible",
             isKeyboardVisible ? "fixed top-0 left-0 right-0" : "sticky top-0"
           )}
           style={{
@@ -2597,6 +2599,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
             right: '0',
             zIndex: 9999,
             transition: 'left 0.3s ease',
+            backgroundColor: '#54a9eb'
           }}
         >
           {selectedContact ? (
