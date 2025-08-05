@@ -1080,6 +1080,12 @@ export default function ChatPage() {
       console.log('🌐 User is online');
       setIsOnline(true);
       setConnectionStatus('connected');
+      
+      // 🔥 ADD THIS: Reload messages when browser comes back online
+      if (selectedContact && currentUser) {
+        console.log('🔄 Reloading messages after browser reconnection...');
+        loadMessages(selectedContact.id);
+      }
     };
 
     const handleOffline = () => {
@@ -1101,7 +1107,7 @@ export default function ChatPage() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [selectedContact, currentUser]); // 🔥 ADD selectedContact and currentUser to dependencies
 
   // Track socket connection status
   useEffect(() => {
@@ -1111,6 +1117,12 @@ export default function ChatPage() {
     const handleConnect = () => {
       console.log('🔌 Socket connected');
       setConnectionStatus('connected');
+      
+      // 🔥 ADD THIS: Reload messages when user comes back online
+      if (selectedContact && currentUser) {
+        console.log('🔄 Reloading messages after reconnection...');
+        loadMessages(selectedContact.id);
+      }
     };
 
     const handleDisconnect = () => {
@@ -1136,7 +1148,7 @@ export default function ChatPage() {
       socket.off('disconnect', handleDisconnect);
       socket.off('connecting', handleConnecting);
     };
-  }, [socketManager]);
+  }, [socketManager, selectedContact, currentUser]); // 🔥 ADD selectedContact and currentUser to dependencies
 
   // Function to check if user should receive notifications (offline for more than 5 minutes)
   const shouldSendOfflineNotification = (lastSeenTime: number) => {
