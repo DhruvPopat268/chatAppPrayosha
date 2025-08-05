@@ -2789,7 +2789,12 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                       )}
                     >
                       {message.type === "text" && (
-                        <p className="text-sm leading-relaxed break-words">{message.content}</p>
+                        <div className="flex items-end justify-between gap-2">
+                          <p className="text-sm leading-relaxed break-words flex-1">{message.content}</p>
+                          <span className="text-xs opacity-70 flex-shrink-0">
+                            {message.timestamp}
+                          </span>
+                        </div>
                       )}
                       {message.type === "image" && message.content && (
                         <div className="space-y-2">
@@ -2800,32 +2805,36 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             style={{ maxWidth: 240, maxHeight: 320 }}
                             onClick={() => setPreviewImage(message.content)}
                           />
-                        </div>
-                      )}
-                      {message.type === "file" && message.content && (
-                        <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
-                          <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <a
-                              href={message.content}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-medium underline hover:no-underline block truncate"
-                            >
-                              {message.fileName || 'Download file'}
-                            </a>
-                            <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
+                          <div className="flex items-center justify-end">
+                            <span className="text-xs opacity-70">
+                              {message.timestamp}
+                            </span>
                           </div>
                         </div>
                       )}
-                      <div className={cn(
-                        "flex items-center mt-1 space-x-1",
-                        message.senderId === "me" ? "justify-end" : "justify-start"
-                      )}>
-                        <p className="text-xs opacity-70">
-                          {message.timestamp}
-                        </p>
-                      </div>
+                      {message.type === "file" && message.content && (
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+                            <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <a
+                                href={message.content}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium underline hover:no-underline block truncate"
+                              >
+                                {message.fileName || 'Download file'}
+                              </a>
+                              <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end">
+                            <span className="text-xs opacity-70">
+                              {message.timestamp}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
