@@ -2857,7 +2857,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
         <div
           className="flex-1 overflow-hidden relative"
           style={{
-            marginTop: isKeyboardVisible ? '64px' : '0', // Account for fixed header
+            marginTop: '64px', // Always account for header height
             paddingBottom: isKeyboardVisible ? '120px' : '0', // Add padding when keyboard is visible
           }}
         >
