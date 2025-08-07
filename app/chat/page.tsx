@@ -2371,6 +2371,26 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
     alert(debugMessage);
   }
 
+  const testVideoCallControls = () => {
+    console.log('=== Testing Video Call Controls ===');
+    if (!webrtcManager) {
+      console.error('WebRTC Manager not available');
+      alert('WebRTC Manager not available for testing');
+      return;
+    }
+    
+    console.log('Testing mute toggle...');
+    webrtcManager.toggleMute();
+    
+    console.log('Testing video toggle...');
+    webrtcManager.toggleVideo();
+    
+    console.log('Testing end call...');
+    webrtcManager.endCall();
+    
+    alert('Video call controls tested. Check console for logs.');
+  }
+
   // 🔥 NEW: Reconnection popup component
   const ReconnectionPopup = () => {
     if (!showReconnectPopup) return null;
@@ -2592,6 +2612,16 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           <User className="h-4 w-4 mr-2" />
                           My Profile
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={debugCallError}>
+                          <Bug className="h-4 w-4 mr-2" />
+                          Debug Call
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={testVideoCallControls}>
+                          <Video className="h-4 w-4 mr-2" />
+                          Test Video Controls
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout
@@ -3272,7 +3302,14 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => webrtcManager?.toggleMute()}
+                onClick={() => {
+                  console.log('Voice call mute button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.toggleMute();
+                  } else {
+                    console.error('WebRTC manager not available for voice call mute toggle');
+                  }
+                }}
                 className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
                 style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
@@ -3281,7 +3318,30 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => webrtcManager?.endCall()}
+                onClick={() => {
+                  console.log('Voice call speaker button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.toggleSpeaker();
+                  } else {
+                    console.error('WebRTC manager not available for speaker toggle');
+                  }
+                }}
+                className={callState.isSpeakerOn ? "bg-blue-500 text-white hover:bg-blue-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
+                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Settings className="h-8 w-8" />
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  console.log('Voice call end button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.endCall();
+                  } else {
+                    console.error('WebRTC manager not available for voice call end');
+                  }
+                }}
                 className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
                 style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
@@ -3324,7 +3384,14 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => webrtcManager?.toggleMute()}
+                onClick={() => {
+                  console.log('Mute button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.toggleMute();
+                  } else {
+                    console.error('WebRTC manager not available for mute toggle');
+                  }
+                }}
                 className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
                 style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
@@ -3333,7 +3400,30 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => webrtcManager?.endCall()}
+                onClick={() => {
+                  console.log('Video toggle button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.toggleVideo();
+                  } else {
+                    console.error('WebRTC manager not available for video toggle');
+                  }
+                }}
+                className={!callState.isVideoEnabled ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
+                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {!callState.isVideoEnabled ? <VideoOff className="h-8 w-8" /> : <Video className="h-8 w-8" />}
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  console.log('End call button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.endCall();
+                  } else {
+                    console.error('WebRTC manager not available for end call');
+                  }
+                }}
                 className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
                 style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >

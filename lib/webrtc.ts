@@ -646,10 +646,14 @@ class WebRTCManager {
   }
 
   endCall() {
+    console.log('endCall called, callData:', !!this.currentCallState.callData);
     if (this.currentCallState.callData) {
-      this.socket.emit('end_call', this.currentCallState.callData)
+      console.log('Emitting end_call event with data:', this.currentCallState.callData);
+      this.socket.emit('end_call', this.currentCallState.callData);
+    } else {
+      console.warn('No call data available for end call');
     }
-    this.resetCallState()
+    this.resetCallState();
   }
 
   private resetCallState() {
@@ -710,29 +714,44 @@ class WebRTCManager {
   }
 
   toggleMute() {
+    console.log('toggleMute called, localStream:', !!this.localStream);
     if (this.localStream) {
-      const audioTrack = this.localStream.getAudioTracks()[0]
+      const audioTrack = this.localStream.getAudioTracks()[0];
       if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled
-        this.currentCallState.isMuted = !audioTrack.enabled
-        this.notifyStateChange()
+        const newEnabledState = !audioTrack.enabled;
+        audioTrack.enabled = newEnabledState;
+        this.currentCallState.isMuted = !newEnabledState;
+        console.log('Audio track enabled:', newEnabledState, 'Muted state:', this.currentCallState.isMuted);
+        this.notifyStateChange();
+      } else {
+        console.warn('No audio track found in local stream');
       }
+    } else {
+      console.warn('No local stream available for mute toggle');
     }
   }
 
   toggleSpeaker() {
-    this.currentCallState.isSpeakerOn = !this.currentCallState.isSpeakerOn
-    this.notifyStateChange()
+    this.currentCallState.isSpeakerOn = !this.currentCallState.isSpeakerOn;
+    console.log('Speaker toggled:', this.currentCallState.isSpeakerOn);
+    this.notifyStateChange();
   }
 
   toggleVideo() {
+    console.log('toggleVideo called, localStream:', !!this.localStream);
     if (this.localStream) {
-      const videoTrack = this.localStream.getVideoTracks()[0]
+      const videoTrack = this.localStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled
-        this.currentCallState.isVideoEnabled = videoTrack.enabled
-        this.notifyStateChange()
+        const newEnabledState = !videoTrack.enabled;
+        videoTrack.enabled = newEnabledState;
+        this.currentCallState.isVideoEnabled = newEnabledState;
+        console.log('Video track enabled:', newEnabledState);
+        this.notifyStateChange();
+      } else {
+        console.warn('No video track found in local stream');
       }
+    } else {
+      console.warn('No local stream available for video toggle');
     }
   }
 
