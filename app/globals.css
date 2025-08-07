@@ -265,3 +265,59 @@ body {
 .voice-call-control-button:hover {
   transform: scale(1.05) !important;
 }
+
+/* Message Layout Stability */
+.chat-message-bubble {
+  max-width: 280px !important;
+  min-width: 60px !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  hyphens: auto !important;
+}
+
+.chat-message-text {
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  hyphens: auto !important;
+  line-height: 1.4 !important;
+}
+
+.chat-message-timestamp {
+  position: absolute !important;
+  bottom: 2px !important;
+  right: 8px !important;
+  font-size: 10px !important;
+  opacity: 0.7 !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+/* Responsive message bubble adjustments */
+@media (max-width: 640px) {
+  .chat-message-bubble {
+    max-width: 240px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-message-bubble {
+    max-width: 200px !important;
+  }
+  
+  .chat-message-text {
+    font-size: 14px !important;
+  }
+}
+
+/* Contact list message overflow handling */
+.contact-last-message {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+
+.contact-timestamp {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}

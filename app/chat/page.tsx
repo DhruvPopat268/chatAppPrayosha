@@ -772,7 +772,7 @@ export default function ChatPage() {
       if (socket) {
         try {
           console.log('Initializing WebRTC manager...');
-          
+
           // Check if we're in a browser environment
           if (typeof window === 'undefined') {
             console.log('Skipping WebRTC initialization on server side');
@@ -793,7 +793,7 @@ export default function ChatPage() {
             console.log('Call state changed:', state);
             setCallState(state)
           })
-          
+
           console.log('WebRTC manager initialized successfully');
         } catch (error) {
           console.error('Failed to initialize WebRTC manager:', error);
@@ -1086,7 +1086,7 @@ export default function ChatPage() {
       console.log('🌐 User is online');
       setIsOnline(true);
       setConnectionStatus('connected');
-      
+
       // 🔥 ENHANCED: Mark that user was offline and trigger reconnection
       if (wasOffline) {
         console.log('🔄 User was offline, triggering reconnection...');
@@ -1124,7 +1124,7 @@ export default function ChatPage() {
     const handleConnect = () => {
       console.log('🔌 Socket connected');
       setConnectionStatus('connected');
-      
+
       // 🔥 ENHANCED: If user was offline, trigger reconnection
       if (wasOffline) {
         console.log('🔌 Socket reconnected after being offline, triggering reconnection...');
@@ -1161,7 +1161,7 @@ export default function ChatPage() {
   // 🔥 NEW: Enhanced reconnection handling
   const handleReconnection = async () => {
     console.log('🔄 Handling reconnection...');
-    
+
     if (selectedContact && currentUser) {
       try {
         console.log('📡 Fetching messages after reconnection...');
@@ -1185,7 +1185,7 @@ export default function ChatPage() {
   const checkInactivityAndReconnect = () => {
     const now = Date.now();
     const inactiveThreshold = 5 * 60 * 1000; // 5 minutes
-    
+
     if (wasOffline && (now - lastActivityTime) > inactiveThreshold) {
       console.log('⏰ User returned from inactivity, triggering reconnection...');
       handleReconnection();
@@ -1195,7 +1195,7 @@ export default function ChatPage() {
   // 🔥 NEW: Activity tracking useEffect
   useEffect(() => {
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-    
+
     const handleActivity = () => {
       updateActivityTime();
       checkInactivityAndReconnect();
@@ -2246,7 +2246,7 @@ export default function ChatPage() {
 
   const testCallFunctionality = async () => {
     console.log('🧪 Testing call functionality...');
-    
+
     if (!webrtcManager) {
       console.error('❌ WebRTC manager not initialized');
       alert('WebRTC manager not initialized. Please refresh the page.');
@@ -2266,12 +2266,12 @@ export default function ChatPage() {
     }
 
     console.log('✅ All prerequisites met, testing device access...');
-    
+
     try {
       // Test device permissions
       const permissions = await webrtcManager.checkDevicePermissions();
       console.log('📱 Device permissions:', permissions);
-      
+
       if (!permissions.audio) {
         alert('Microphone access required for calls. Please allow microphone access.');
         return;
@@ -2281,7 +2281,7 @@ export default function ChatPage() {
       console.log('🔍 Testing actual device access...');
       const audioAccess = await webrtcManager.testDeviceAccess(true, false);
       console.log('🎤 Audio access test result:', audioAccess);
-      
+
       if (!audioAccess) {
         alert('Failed to access microphone. Please check device permissions and try again.');
         return;
@@ -2298,7 +2298,7 @@ export default function ChatPage() {
 
       console.log('✅ All tests passed, ready for calls');
       alert('Call functionality is ready! You can now make voice or video calls.\n\nDiagnostics:\n' + JSON.stringify(diagnostics, null, 2));
-      
+
     } catch (error) {
       console.error('❌ Error testing call functionality:', error);
       alert('Error testing call functionality: ' + (error instanceof Error ? error.message : String(error)));
@@ -2307,7 +2307,7 @@ export default function ChatPage() {
 
   const testSocketConnection = () => {
     console.log('🧪 Testing socket connection...');
-    
+
     const socket = socketManager.getSocket();
     if (!socket) {
       alert('Socket not available');
@@ -2321,13 +2321,13 @@ export default function ChatPage() {
 
     // Test sending a simple event
     socket.emit('test_event', { message: 'Test from client' });
-    
+
     alert(`Socket Status:\nConnected: ${socket.connected ? 'Yes' : 'No'}\nID: ${socket.id || 'None'}`);
   }
 
   const debugCallError = async () => {
     console.log('🔍 Debugging call error...');
-    
+
     const debugInfo = {
       webrtcManager: !!webrtcManager,
       socket: !!socketManager.getSocket(),
@@ -2349,7 +2349,7 @@ export default function ChatPage() {
     }
 
     console.log('🔍 Call Debug Info:', debugInfo);
-    
+
     const debugMessage = `Call Debug Information:
     
 WebRTC Manager: ${debugInfo.webrtcManager ? '✅ Initialized' : '❌ Not initialized'}
@@ -2378,16 +2378,16 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
       alert('WebRTC Manager not available for testing');
       return;
     }
-    
+
     console.log('Testing mute toggle...');
     webrtcManager.toggleMute();
-    
+
     console.log('Testing video toggle...');
     webrtcManager.toggleVideo();
-    
+
     console.log('Testing end call...');
     webrtcManager.endCall();
-    
+
     alert('Video call controls tested. Check console for logs.');
   }
 
@@ -2466,12 +2466,12 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           }
         }
       `}</style>
-  
+
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-5 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
-  
+
       {/* Sidebar - Telegram Style */}
       <div
         className={cn(
@@ -2498,7 +2498,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
         >
           {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
-  
+
         {/* Sidebar Content */}
         <div
           className={cn(
@@ -2509,7 +2509,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           {isSidebarOpen ? (
             <>
               {/* Telegram-style Header */}
-              <div 
+              <div
                 className="p-4 text-white pt-16"
                 style={{ backgroundColor: '#54a9eb' }}
               >
@@ -2554,7 +2554,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                               className="pl-10 border-gray-200 focus:border-blue-500"
                             />
                           </div>
-  
+
                           {/* Search Results */}
                           {friendSearchQuery.trim() && (
                             <div>
@@ -2600,7 +2600,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                         </div>
                       </DialogContent>
                     </Dialog>
-  
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 p-2">
@@ -2613,15 +2613,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           My Profile
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={debugCallError}>
-                          <Bug className="h-4 w-4 mr-2" />
-                          Debug Call
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={testVideoCallControls}>
-                          <Video className="h-4 w-4 mr-2" />
-                          Test Video Controls
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
+
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                           <LogOut className="h-4 w-4 mr-2" />
                           Logout
@@ -2630,7 +2622,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     </DropdownMenu>
                   </div>
                 </div>
-  
+
                 {/* Search Bar */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 h-4 w-4" />
@@ -2642,7 +2634,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   />
                 </div>
               </div>
-  
+
               {/* Contacts List - Telegram Style */}
               <ScrollArea className="flex-1 bg-white">
                 <div className="p-0">
@@ -2674,10 +2666,10 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                       <div className="ml-3 flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <p className="text-sm font-medium text-gray-900 truncate">{contact.name}</p>
-                          <p className="text-xs text-gray-500">{contact.timestamp}</p>
+                          <p className="text-xs text-gray-500 contact-timestamp">{contact.timestamp}</p>
                         </div>
                         <div className="flex items-center justify-between">
-                          <p className="text-sm text-gray-500 truncate">{contact.lastMessage}</p>
+                          <p className="text-sm text-gray-500 contact-last-message">{contact.lastMessage}</p>
                           {contact.unread > 0 && (
                             <div className="ml-2 h-5 w-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
                               {contact.unread > 9 ? '9+' : contact.unread}
@@ -2705,7 +2697,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               >
                 <UserPlus className="h-4 w-4" />
               </Button>
-  
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="p-2 rounded-full hover:bg-gray-100" title="Menu">
@@ -2728,7 +2720,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           )}
         </div>
       </div>
-  
+
       {/* Main Chat Area - Telegram Style */}
       <div
         ref={chatContainerRef}
@@ -2790,7 +2782,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           ? `last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
                           : "offline"}
                   </p>
-                
+
                 </div>
               </div>
               <div className="flex items-center space-x-1">
@@ -2824,7 +2816,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 >
                   <Phone className="h-5 w-5" />
                 </Button>
-  
+
                 {/* Video Call Button */}
                 <Button
                   variant="ghost"
@@ -2855,7 +2847,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 >
                   <Video className="h-5 w-5" />
                 </Button>
-  
+
                 {/* More Options Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -2864,7 +2856,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                   
+
                     <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete History
@@ -2882,7 +2874,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
             </div>
           )}
         </div>
-  
+
         {/* Messages Area - Telegram Style */}
         <div
           className="flex-1 overflow-hidden relative"
@@ -2928,16 +2920,16 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   >
                     <div
                       className={cn(
-                        "max-w-xs lg:max-w-md px-3 py-2 rounded-2xl shadow-sm relative",
+                        "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative",
                         message.senderId === "me"
                           ? "bg-blue-500 text-white rounded-br-md"
                           : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
                       )}
                     >
                       {message.type === "text" && (
-                        <div className="flex items-end justify-between gap-2">
-                          <p className="text-sm leading-relaxed break-words flex-1">{message.content}</p>
-                          <span className="text-xs opacity-70 flex-shrink-0">
+                        <div className="relative">
+                          <p className="chat-message-text text-sm pr-12">{message.content}</p>
+                          <span className="chat-message-timestamp">
                             {message.timestamp}
                           </span>
                         </div>
@@ -2952,7 +2944,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             onClick={() => setPreviewImage(message.content)}
                           />
                           <div className="flex items-center justify-end">
-                            <span className="text-xs opacity-70">
+                            <span className="chat-message-timestamp">
                               {message.timestamp}
                             </span>
                           </div>
@@ -2975,7 +2967,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             </div>
                           </div>
                           <div className="flex items-center justify-end">
-                            <span className="text-xs opacity-70">
+                            <span className="chat-message-timestamp">
                               {message.timestamp}
                             </span>
                           </div>
@@ -2988,7 +2980,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               <div ref={messagesEndRef} className="h-4" />
             </div>
           </ScrollArea>
-  
+
           {/* Scroll to Bottom Button */}
           {showScrollToBottom && (
             <Button
@@ -3008,7 +3000,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
             </Button>
           )}
         </div>
-  
+
         {/* Telegram-style Message Input - Always Visible */}
         <div
           className={cn(
@@ -3041,7 +3033,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               className="hidden"
               onChange={handleImageChange}
             />
-  
+
             <div className="flex-1 relative">
               <Input
                 ref={messageInputRef}
@@ -3063,7 +3055,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 autoCapitalize="sentences"
               />
             </div>
-  
+
             <div
               className="flex-shrink-0"
               onMouseDown={(e) => e.preventDefault()}
@@ -3097,7 +3089,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </div>
         </div>
       </div>
-  
+
       {/* Keep all your existing modals (Profile, Delete History, Call modals, etc.) */}
       {/* Profile Modal */}
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
@@ -3131,7 +3123,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
             </div>
-  
+
             {/* Profile Information */}
             <div className="space-y-4">
               <div>
@@ -3147,7 +3139,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   <p className="mt-1 text-sm text-gray-600 p-2 bg-gray-50 rounded">{currentUser.username}</p>
                 )}
               </div>
-  
+
               <div>
                 <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 {isEditingProfile && editedUser ? (
@@ -3162,7 +3154,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   <p className="mt-1 text-sm text-gray-600 p-2 bg-gray-50 rounded">{currentUser.email}</p>
                 )}
               </div>
-  
+
               <div>
                 <Label htmlFor="bio" className="text-sm font-medium">Bio</Label>
                 {isEditingProfile && editedUser ? (
@@ -3178,7 +3170,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 )}
               </div>
             </div>
-  
+
             {/* Action Buttons */}
             <div className="flex justify-end space-x-2">
               {isEditingProfile ? (
@@ -3202,7 +3194,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </div>
         </DialogContent>
       </Dialog>
-  
+
       {/* Delete History Confirmation */}
       {showDeleteConfirm && selectedContact && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -3222,7 +3214,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </Card>
         </div>
       )}
-  
+
       {/* Incoming Call Modal */}
       {callState.isIncoming && callState.callData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -3264,7 +3256,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </Card>
         </div>
       )}
-  
+
       {/* Outgoing Call Modal */}
       {callState.isOutgoing && callState.callData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -3292,7 +3284,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </Card>
         </div>
       )}
-  
+
       {/* Voice Call Modal */}
       {callState.isConnected && callState.callData && callState.callData.callType === 'voice' && (
         <div className="voice-call-container">
@@ -3318,7 +3310,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 <p className="text-sm text-gray-400">Call in progress...</p>
               </div>
             </div>
-            
+
             {/* Fixed Controls Container - Always at bottom */}
             <div className="voice-call-controls">
               <Button
@@ -3336,23 +3328,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               >
                 {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
               </Button>
-              
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => {
-                  console.log('Voice call speaker button clicked, webrtcManager:', !!webrtcManager);
-                  if (webrtcManager) {
-                    webrtcManager.toggleSpeaker();
-                  } else {
-                    console.error('WebRTC manager not available for speaker toggle');
-                  }
-                }}
-                className={`voice-call-control-button ${callState.isSpeakerOn ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white text-gray-800 hover:bg-gray-200"}`}
-              >
-                <Settings className="h-8 w-8" />
-              </Button>
-              
+
               <Button
                 variant="outline"
                 size="lg"
@@ -3372,7 +3348,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </div>
         </div>
       )}
-  
+
       {/* Video Call Modal */}
       {callState.isConnected && callState.callData && callState.callData.callType === 'video' && (
         <div className="video-call-container">
@@ -3391,7 +3367,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   }
                 }}
               />
-              
+
               {/* Local Video - Fixed position overlay */}
               <div className="video-call-local-video">
                 <video
@@ -3407,7 +3383,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 />
               </div>
             </div>
-            
+
             {/* Fixed Controls Container - Always at bottom */}
             <div className="video-call-controls">
               <Button
@@ -3425,7 +3401,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               >
                 {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="lg"
@@ -3441,7 +3417,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               >
                 {!callState.isVideoEnabled ? <VideoOff className="h-8 w-8" /> : <Video className="h-8 w-8" />}
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="lg"
@@ -3461,7 +3437,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </div>
         </div>
       )}
-  
+
       {/* Image Preview Modal */}
       {previewImage && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onClick={() => setPreviewImage(null)}>
@@ -3478,7 +3454,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
           </div>
         </div>
       )}
-  
+
       {/* Audio Elements for Call Streams */}
       <audio ref={localAudioRef} autoPlay playsInline muted style={{ display: 'none' }} />
       <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
