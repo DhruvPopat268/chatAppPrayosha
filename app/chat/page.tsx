@@ -3295,10 +3295,32 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
   
       {/* Voice Call Modal */}
       {callState.isConnected && callState.callData && callState.callData.callType === 'voice' && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl p-4 flex flex-col items-center relative">
-            {/* Voice Call Controls - Large, always visible */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-6 z-10">
+        <div className="voice-call-container">
+          <div className="voice-call-modal">
+            {/* Fixed Voice Call Display */}
+            <div className="voice-call-display">
+              {/* Call Icon */}
+              <div className="w-32 h-32 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-8 animate-pulse">
+                <Phone className="h-16 w-16 text-white" />
+              </div>
+              {/* Call Status */}
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-semibold text-white mb-2">Voice Call</h3>
+                <p className="text-lg text-gray-300">
+                  {selectedContact?.name || 'Unknown Contact'}
+                </p>
+                <p className="text-sm text-gray-400 mt-2">
+                  {callState.isMuted ? 'Microphone Muted' : 'Microphone Active'}
+                </p>
+              </div>
+              {/* Call Duration */}
+              <div className="text-center">
+                <p className="text-sm text-gray-400">Call in progress...</p>
+              </div>
+            </div>
+            
+            {/* Fixed Controls Container - Always at bottom */}
+            <div className="voice-call-controls">
               <Button
                 variant="outline"
                 size="lg"
@@ -3310,11 +3332,11 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     console.error('WebRTC manager not available for voice call mute toggle');
                   }
                 }}
-                className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
-                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className={`voice-call-control-button ${callState.isMuted ? "bg-red-500 text-white hover:bg-red-600" : "bg-white text-gray-800 hover:bg-gray-200"}`}
               >
                 {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
               </Button>
+              
               <Button
                 variant="outline"
                 size="lg"
@@ -3326,11 +3348,11 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     console.error('WebRTC manager not available for speaker toggle');
                   }
                 }}
-                className={callState.isSpeakerOn ? "bg-blue-500 text-white hover:bg-blue-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
-                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className={`voice-call-control-button ${callState.isSpeakerOn ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-white text-gray-800 hover:bg-gray-200"}`}
               >
                 <Settings className="h-8 w-8" />
               </Button>
+              
               <Button
                 variant="outline"
                 size="lg"
@@ -3342,45 +3364,52 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     console.error('WebRTC manager not available for voice call end');
                   }
                 }}
-                className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
-                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className="voice-call-control-button bg-red-500 text-white hover:bg-red-600"
               >
                 <PhoneOff className="h-8 w-8" />
               </Button>
             </div>
-            <div className="relative w-full flex flex-col items-center">
-              {/* Voice Call Display */}
-              <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[60vh]">
-                {/* Call Icon */}
-                <div className="w-32 h-32 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-8 animate-pulse">
-                  <Phone className="h-16 w-16 text-white" />
-                </div>
-                {/* Call Status */}
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-semibold text-white mb-2">Voice Call</h3>
-                  <p className="text-lg text-gray-300">
-                    {selectedContact?.name || 'Unknown Contact'}
-                  </p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    {callState.isMuted ? 'Microphone Muted' : 'Microphone Active'}
-                  </p>
-                </div>
-                {/* Call Duration (if needed) */}
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">Call in progress...</p>
-                </div>
-              </div>
-            </div>
-          </Card>
+          </div>
         </div>
       )}
   
       {/* Video Call Modal */}
       {callState.isConnected && callState.callData && callState.callData.callType === 'video' && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl p-4 flex flex-col items-center relative">
-            {/* Video Controls - Large, always visible */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-6 z-10">
+        <div className="video-call-container">
+          <div className="video-call-modal">
+            {/* Fixed Video Container */}
+            <div className="video-call-video-container">
+              {/* Remote Video - Fixed size container */}
+              <video
+                id="remoteVideo"
+                autoPlay
+                playsInline
+                className="video-call-remote-video"
+                ref={node => {
+                  if (node && callState.remoteStream) {
+                    node.srcObject = callState.remoteStream;
+                  }
+                }}
+              />
+              
+              {/* Local Video - Fixed position overlay */}
+              <div className="video-call-local-video">
+                <video
+                  id="localVideo"
+                  autoPlay
+                  playsInline
+                  muted
+                  ref={node => {
+                    if (node && callState.localStream) {
+                      node.srcObject = callState.localStream;
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            
+            {/* Fixed Controls Container - Always at bottom */}
+            <div className="video-call-controls">
               <Button
                 variant="outline"
                 size="lg"
@@ -3392,11 +3421,11 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     console.error('WebRTC manager not available for mute toggle');
                   }
                 }}
-                className={callState.isMuted ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
-                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className={`video-call-control-button ${callState.isMuted ? "bg-red-500 text-white hover:bg-red-600" : "bg-white text-gray-800 hover:bg-gray-200"}`}
               >
                 {callState.isMuted ? <MicOff className="h-8 w-8" /> : <Mic className="h-8 w-8" />}
               </Button>
+              
               <Button
                 variant="outline"
                 size="lg"
@@ -3408,11 +3437,11 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     console.error('WebRTC manager not available for video toggle');
                   }
                 }}
-                className={!callState.isVideoEnabled ? "bg-red-500 text-white hover:bg-red-600 border-none" : "bg-white text-gray-800 hover:bg-gray-200 border-none shadow"}
-                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className={`video-call-control-button ${!callState.isVideoEnabled ? "bg-red-500 text-white hover:bg-red-600" : "bg-white text-gray-800 hover:bg-gray-200"}`}
               >
                 {!callState.isVideoEnabled ? <VideoOff className="h-8 w-8" /> : <Video className="h-8 w-8" />}
               </Button>
+              
               <Button
                 variant="outline"
                 size="lg"
@@ -3424,50 +3453,12 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     console.error('WebRTC manager not available for end call');
                   }
                 }}
-                className="bg-red-500 text-white hover:bg-red-600 border-none shadow"
-                style={{ width: 56, height: 56, borderRadius: 28, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className="video-call-control-button bg-red-500 text-white hover:bg-red-600"
               >
                 <PhoneOff className="h-8 w-8" />
               </Button>
             </div>
-            <div className="relative w-full flex flex-col items-center">
-              {/* Remote Video */}
-              <video
-                id="remoteVideo"
-                autoPlay
-                playsInline
-                style={{ width: '100%', maxHeight: '60vh', background: '#222', borderRadius: '12px' }}
-                ref={node => {
-                  if (node && callState.remoteStream) {
-                    node.srcObject = callState.remoteStream;
-                  }
-                }}
-              />
-              {/* Local Video (small overlay) */}
-              <video
-                id="localVideo"
-                autoPlay
-                playsInline
-                muted
-                style={{
-                  position: 'absolute',
-                  bottom: '16px',
-                  right: '16px',
-                  width: '120px',
-                  height: '90px',
-                  background: '#444',
-                  borderRadius: '8px',
-                  border: '2px solid #fff',
-                  objectFit: 'cover',
-                }}
-                ref={node => {
-                  if (node && callState.localStream) {
-                    node.srcObject = callState.localStream;
-                  }
-                }}
-              />
-            </div>
-          </Card>
+          </div>
         </div>
       )}
   

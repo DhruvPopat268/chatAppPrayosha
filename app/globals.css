@@ -92,3 +92,176 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Video Call Layout Stability */
+.video-call-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.video-call-modal {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 1200px !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  background: black !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.video-call-video-container {
+  flex: 1 !important;
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 400px !important;
+  max-height: 70vh !important;
+  background: #222 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.video-call-remote-video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  background: #222 !important;
+  min-height: 400px !important;
+  max-height: 70vh !important;
+}
+
+.video-call-local-video {
+  position: absolute !important;
+  bottom: 16px !important;
+  right: 16px !important;
+  width: 128px !important;
+  height: 96px !important;
+  background: #444 !important;
+  border-radius: 8px !important;
+  border: 2px solid white !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  overflow: hidden !important;
+}
+
+.video-call-local-video video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.video-call-controls {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent) !important;
+  padding: 24px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 24px !important;
+}
+
+.video-call-control-button {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 28px !important;
+  font-size: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.2s ease !important;
+}
+
+.video-call-control-button:hover {
+  transform: scale(1.05) !important;
+}
+
+/* Voice Call Layout Stability */
+.voice-call-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.voice-call-modal {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 800px !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  background: black !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.voice-call-display {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 400px !important;
+  max-height: 70vh !important;
+  padding: 32px !important;
+}
+
+.voice-call-controls {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent) !important;
+  padding: 24px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 24px !important;
+}
+
+.voice-call-control-button {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 28px !important;
+  font-size: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 56px !important;
+  min-height: 56px !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.2s ease !important;
+}
+
+.voice-call-control-button:hover {
+  transform: scale(1.05) !important;
+}
