@@ -72,7 +72,10 @@ export default function LoginPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full flex items-center justify-center" disabled={isLoading}>
+              {isLoading && (
+                <span className="mr-2 inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              )}
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </CardFooter>
