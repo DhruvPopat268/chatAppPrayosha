@@ -367,29 +367,3 @@ export async function updateAdminProfile(data: {
     return { error: 'Profile update failed. Please try again.' };
   }
 }
-
-// Trigger session cleanup (admin only)
-export async function triggerSessionCleanup(): Promise<{ success?: boolean; error?: string; deletedCount?: number }> {
-  try {
-    const adminToken = localStorage.getItem('adminToken');
-    if (!adminToken) {
-      return { error: 'Admin token not found. Please login again.' };
-    }
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin-auth/cleanup-sessions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${adminToken}`
-      }
-    });
-    
-    const result = await response.json();
-    if (!response.ok) {
-      return { error: result.error || 'Failed to trigger cleanup' };
-    }
-    
-    return { success: true, deletedCount: result.deletedCount };
-  } catch (error) {
-    return { error: 'Failed to trigger cleanup. Please try again.' };
-  }
-}

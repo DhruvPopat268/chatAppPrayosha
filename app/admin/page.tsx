@@ -30,7 +30,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { UserPlus, Trash2, Users, Shield, LogOut, Search, Eye, EyeOff, Edit2, MoreVertical } from "lucide-react"
-import { getCurrentAdmin, signOutAdmin, getAllUsers, createUser, deleteUser, updateUser, updateAdminProfile, triggerSessionCleanup } from "@/lib/admin-auth"
+import { getCurrentAdmin, signOutAdmin, getAllUsers, createUser, deleteUser, updateUser, updateAdminProfile } from "@/lib/admin-auth"
 
 interface User {
   id: string
@@ -74,9 +74,6 @@ export default function AdminDashboard() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [editProfileLoading, setEditProfileLoading] = useState(false)
 
-  // New state for session cleanup
-  const [cleanupLoading, setCleanupLoading] = useState(false)
-
   useEffect(() => {
     const checkAuth = async () => {
       // Check localStorage first (synchronous)
@@ -113,7 +110,6 @@ export default function AdminDashboard() {
 
     checkAuth()
     loadUsers()
-    loadSessionStats() // Load session stats
 
     // Check if mobile view
     const checkMobile = () => {
@@ -252,58 +248,6 @@ export default function AdminDashboard() {
       alert("Failed to update profile")
     } finally {
       setEditProfileLoading(false)
-    }
-  }
-
-  const loadSessionStats = async () => {
-    try {
-      const stats = await getSessionStats()
-      if (!stats.error) {
-        setSessionStats(stats)
-      }
-    } catch (error) {
-      console.error("Failed to load session stats:", error)
-    }
-  }
-
-  const handleSessionCleanup = async () => {
-    if (!confirm("This will delete all sessions older than 1 day. Continue?")) {
-      return
-    }
-    
-    setCleanupLoading(true)
-    try {
-      const result = await triggerSessionCleanup()
-      if (result.error) {
-        alert(result.error)
-        return
-      }
-      alert(`Session cleanup completed! Deleted ${result.deletedCount} old sessions.`)
-    } catch (error) {
-      alert("Failed to trigger session cleanup")
-    } finally {
-      setCleanupLoading(false)
-    }
-  }
-
-  const handleAggressiveCleanup = async () => {
-    if (!confirm("This will delete ALL sessions older than 14 days. Are you sure?")) {
-      return
-    }
-    
-    setAggressiveCleanupLoading(true)
-    try {
-      const result = await triggerAggressiveCleanup()
-      if (result.error) {
-        alert(result.error)
-        return
-      }
-      alert(`Aggressive cleanup completed! Deleted ${result.deletedCount} sessions.`)
-      await loadSessionStats() // Refresh stats
-    } catch (error) {
-      alert("Failed to trigger aggressive cleanup")
-    } finally {
-      setAggressiveCleanupLoading(false)
     }
   }
 
@@ -457,62 +401,6 @@ export default function AdminDashboard() {
       </div>
 
       <div className="p-4 md:p-6">
-        {/* Session Management Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Session Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {sessionStats ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-blue-600">Total Sessions</h3>
-                  <p className="text-2xl font-bold text-blue-900">{sessionStats.total}</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-green-600">Active Sessions</h3>
-                  <p className="text-2xl font-bold text-green-900">{sessionStats.active}</p>
-                </div>
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-yellow-600">Inactive Sessions</h3>
-                  <p className="text-2xl font-bold text-yellow-900">{sessionStats.inactive}</p>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-red-600">Very Old Sessions</h3>
-                  <p className="text-2xl font-bold text-red-900">{sessionStats.byAge?.veryOld || 0}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500">Loading session statistics...</div>
-            )}
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                onClick={handleSessionCleanup} 
-                disabled={cleanupLoading}
-                variant="outline"
-                className="w-full sm:w-auto"
-              >
-                {cleanupLoading ? "Cleaning..." : "Clean Old Sessions (1+ days old)"}
-              </Button>
-              <Button 
-                onClick={handleAggressiveCleanup} 
-                disabled={aggressiveCleanupLoading}
-                variant="destructive"
-                className="w-full sm:w-auto"
-              >
-                {aggressiveCleanupLoading ? "Cleaning..." : "Aggressive Cleanup (14+ days)"}
-              </Button>
-            </div>
-            
-            <div className="mt-4 text-sm text-gray-600">
-              <p>• <strong>Regular Cleanup:</strong> Marks sessions inactive after 7 days, deletes after 30 days</p>
-              <p>• <strong>Aggressive Cleanup:</strong> Deletes ALL sessions older than 14 days</p>
-              <p>• <strong>Auto-cleanup:</strong> Runs every 2 hours automatically</p>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Mobile-Responsive User Management */}
         <Card>
           <CardHeader className="space-y-4">
