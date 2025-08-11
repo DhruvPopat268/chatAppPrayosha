@@ -522,7 +522,7 @@ io.on('connection', (socket) => {
             
             // Check if the notification was actually sent successfully
             if (notificationResponse.data.id === '' || notificationResponse.data.errors) {
-              console.error('OneSignal notification failed for user', receiverId, ':', notificationResponse.data);
+              console.log('OneSignal notification failed for user', receiverId, ':', notificationResponse.data);
               
               // If the player is not subscribed, clear the invalid playerId
               if (notificationResponse.data.errors && notificationResponse.data.errors.includes('All included players are not subscribed')) {
@@ -561,6 +561,118 @@ io.on('connection', (socket) => {
     } catch (error) {
       console.error('Error sending message:', error);
       socket.emit('message_error', 'Failed to send message');
+    }
+  });
+
+  // 🔥 NEW: Handle chat opened event for read receipts
+  socket.on('chat_opened', async (data) => {
+    try {
+      const { senderId } = data; // senderId is the user whose chat was opened
+      const currentUserId = socket.userId; // Current user who opened the chat
+
+      console.log(`📖 Chat opened: User ${currentUserId} opened chat with ${senderId}`);
+
+      // Get all unread messages from this sender to the current user
+      const Message = require('./models/messageModel');
+      const unreadMessages = await Message.find({
+        senderId: senderId,
+        receiverId: currentUserId,
+        isRead: false
+      });
+
+      if (unreadMessages.length > 0) {
+        console.log(`📖 Marking ${unreadMessages.length} messages as read from ${senderId} to ${currentUserId}`);
+
+        // Mark all unread messages as read
+        await Message.updateMany(
+          {
+            senderId: senderId,
+            receiverId: currentUserId,
+            isRead: false
+          },
+          {
+            $set: { isRead: true }
+          }
+        );
+
+        // Notify the sender that their messages have been read
+        const senderSocketId = connectedUsers.get(senderId);
+        if (senderSocketId) {
+          // Sender is online, send real-time update
+          io.to(senderSocketId).emit('messages_read_by_receiver', {
+            receiverId: currentUserId,
+            messageCount: unreadMessages.length,
+            timestamp: new Date()
+          });
+          console.log(`✅ Real-time read receipt sent to online sender ${senderId}`);
+        } else {
+          // Sender is offline, they'll get the update when they reconnect
+          console.log(`📴 Sender ${senderId} is offline, read receipt will be sent on reconnection`);
+        }
+
+        // Send confirmation to the current user
+        socket.emit('chat_opened_confirmation', {
+          senderId: senderId,
+          messageCount: unreadMessages.length
+        });
+      } else {
+        console.log(`📖 No unread messages from ${senderId} to ${currentUserId}`);
+        socket.emit('chat_opened_confirmation', {
+          senderId: senderId,
+          messageCount: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error handling chat_opened event:', error);
+      socket.emit('chat_opened_error', 'Failed to mark messages as read');
+    }
+  });
+
+  // 🔥 NEW: Handle offline reconnection for read receipts
+  socket.on('request_read_receipts', async (data) => {
+    try {
+      const { lastSeen } = data;
+      const currentUserId = socket.userId;
+
+      console.log(`📖 User ${currentUserId} reconnected, checking for read receipts since ${lastSeen}`);
+
+      // Get all messages sent by this user that were marked as read while they were offline
+      const Message = require('./models/messageModel');
+      const readMessages = await Message.find({
+        senderId: currentUserId,
+        isRead: true,
+        updatedAt: { $gte: new Date(lastSeen) }
+      }).populate('receiverId', 'username');
+
+      if (readMessages.length > 0) {
+        console.log(`📖 Found ${readMessages.length} messages marked as read while user was offline`);
+
+        // Group messages by receiver
+        const readReceiptsByReceiver = {};
+        readMessages.forEach(message => {
+          const receiverId = message.receiverId._id.toString();
+          if (!readReceiptsByReceiver[receiverId]) {
+            readReceiptsByReceiver[receiverId] = [];
+          }
+          readReceiptsByReceiver[receiverId].push(message);
+        });
+
+        // Send read receipts for each receiver
+        Object.entries(readReceiptsByReceiver).forEach(([receiverId, messages]) => {
+          socket.emit('messages_read_by_receiver', {
+            receiverId: receiverId,
+            messageCount: messages.length,
+            timestamp: new Date(),
+            isOfflineUpdate: true
+          });
+        });
+
+        console.log(`✅ Sent ${readMessages.length} offline read receipts to user ${currentUserId}`);
+      } else {
+        console.log(`📖 No new read receipts for user ${currentUserId}`);
+      }
+    } catch (error) {
+      console.error('Error handling request_read_receipts event:', error);
     }
   });
 

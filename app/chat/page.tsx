@@ -233,6 +233,8 @@ interface Message {
   type: "text" | "image" | "file" | "voice"
   fileName?: string
   fileSize?: string
+  // 🔥 NEW: Add read status for read receipts
+  isRead?: boolean
 }
 
 interface ApiUser {
@@ -340,6 +342,10 @@ export default function ChatPage() {
   const [isOnline, setIsOnline] = useState(true);
   const [lastSeen, setLastSeen] = useState<number | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+
+  // 🔥 NEW: Add read receipts state
+  const [messageReadStatus, setMessageReadStatus] = useState<Map<string, boolean>>(new Map());
+  const [lastReadReceipts, setLastReadReceipts] = useState<Map<string, number>>(new Map());
 
   // 🔥 NEW: Add reconnection handling state
   const [showReconnectPopup, setShowReconnectPopup] = useState(false);
@@ -934,6 +940,52 @@ export default function ChatPage() {
         }
       });
     }
+
+    // 🔥 NEW: Listen for read receipts
+    socketManager.onMessagesReadByReceiver((data) => {
+      console.log('📖 Messages read by receiver:', data);
+      
+      if (data.receiverId === currentUser.id) {
+        // Our messages were read by someone else
+        // Update the read status for all messages sent to this receiver
+        setMessages(prev => prev.map(msg => {
+          if (msg.senderId === "me") {
+            return { ...msg, isRead: true };
+          }
+          return msg;
+        }));
+        
+        // Update the message read status state
+        setMessageReadStatus(prev => {
+          const newStatus = new Map(prev);
+          // Mark all messages as read
+          prev.forEach((_, messageId) => {
+            newStatus.set(messageId, true);
+          });
+          return newStatus;
+        });
+        
+        // Store the timestamp of when our messages were read
+        setLastReadReceipts(prev => {
+          const newReceipts = new Map(prev);
+          newReceipts.set(data.receiverId, data.timestamp.getTime());
+          return newReceipts;
+        });
+      }
+    });
+
+    // 🔥 NEW: Listen for chat opened confirmation
+    socketManager.onChatOpenedConfirmation((data) => {
+      console.log('📖 Chat opened confirmation:', data);
+      // Messages were successfully marked as read
+    });
+
+    // 🔥 NEW: Listen for chat opened errors
+    socketManager.onChatOpenedError((error) => {
+      console.error('📖 Chat opened error:', error);
+      // Handle error if needed
+    });
+
     return () => {
       socketManager.removeAllListeners();
       if (socketManager.getSocket()) {
@@ -1166,6 +1218,13 @@ export default function ChatPage() {
       try {
         console.log('📡 Fetching messages after reconnection...');
         await loadMessages(selectedContact.id);
+        
+        // 🔥 NEW: Request read receipts for messages sent while offline
+        if (lastSeen && socketManager.isSocketConnected()) {
+          console.log('📖 Requesting read receipts since offline...');
+          socketManager.requestReadReceipts(lastSeen);
+        }
+        
         setWasOffline(false);
         setShowReconnectPopup(false);
       } catch (error) {
@@ -1174,6 +1233,15 @@ export default function ChatPage() {
         setShowReconnectPopup(true);
       }
     }
+  };
+
+  // 🔥 NEW: Update message read status when read receipts are received
+  const updateMessageReadStatus = (messageId: string, isRead: boolean) => {
+    setMessageReadStatus(prev => {
+      const newStatus = new Map(prev);
+      newStatus.set(messageId, isRead);
+      return newStatus;
+    });
   };
 
   // 🔥 NEW: Activity tracking
@@ -1391,9 +1459,19 @@ export default function ChatPage() {
       content: newMessage,
       timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
       type: "text",
+      // 🔥 NEW: Set initial read status for new messages
+      isRead: false
     };
 
     setMessages(prev => [...prev, message]);
+    
+    // 🔥 NEW: Update message read status state
+    setMessageReadStatus(prev => {
+      const newStatus = new Map(prev);
+      newStatus.set(message.id, false);
+      return newStatus;
+    });
+    
     setNewMessage("");
 
     // Update contact's last message
@@ -1536,11 +1614,23 @@ export default function ChatPage() {
             type: msg.type || "text",
             fileName: msg.fileName,
             fileSize: msg.fileSize,
+            // 🔥 NEW: Include read status from backend
+            isRead: msg.isRead || false
           }
         })
 
         console.log('✅ Formatted messages:', formattedMessages)
         setMessages(formattedMessages)
+        
+        // 🔥 NEW: Update message read status state
+        const newMessageReadStatus = new Map<string, boolean>();
+        formattedMessages.forEach(msg => {
+          if (msg.senderId === "me") {
+            newMessageReadStatus.set(msg.id, msg.isRead || false);
+          }
+        });
+        setMessageReadStatus(newMessageReadStatus);
+        
         setMessagesReady(true) // Mark messages as ready
       } else {
         console.error('Failed to load messages')
@@ -1649,6 +1739,12 @@ export default function ChatPage() {
       // Add a small delay to ensure currentUser is fully set
       const timer = setTimeout(() => {
         loadMessages(selectedContact.id)
+        
+        // 🔥 NEW: Send chat opened event to mark messages as read
+        if (socketManager.isSocketConnected()) {
+          console.log(`📖 Sending chat_opened event for contact: ${selectedContact.id}`);
+          socketManager.sendChatOpened(selectedContact.id);
+        }
       }, 100)
 
       return () => clearTimeout(timer)
@@ -1716,8 +1812,17 @@ export default function ChatPage() {
         content: url,
         timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
         type: "image",
+        isRead: false
       };
       setMessages(prev => [...prev, message]);
+      
+      // 🔥 NEW: Update message read status state for image
+      setMessageReadStatus(prev => {
+        const newStatus = new Map(prev);
+        newStatus.set(message.id, false);
+        return newStatus;
+      });
+      
       setNewMessage("");
     }
   };
@@ -1740,8 +1845,17 @@ export default function ChatPage() {
         type: "file",
         fileName: file.name,
         fileSize: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+        isRead: false
       };
       setMessages(prev => [...prev, message]);
+      
+      // 🔥 NEW: Update message read status state for file
+      setMessageReadStatus(prev => {
+        const newStatus = new Map(prev);
+        newStatus.set(message.id, false);
+        return newStatus;
+      });
+      
       setNewMessage("");
     }
   };
@@ -2929,9 +3043,32 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                       {message.type === "text" && (
                         <div className="relative">
                           <p className="chat-message-text text-sm pr-12">{message.content}</p>
-                          <span className="chat-message-timestamp">
-                            {message.timestamp}
-                          </span>
+                          <div className="flex items-center justify-end space-x-1 mt-1">
+                            <span className="chat-message-timestamp text-xs">
+                              {message.timestamp}
+                            </span>
+                            {/* 🔥 NEW: Read receipts with ticks */}
+                            {message.senderId === "me" && (
+                              <div className="flex items-center ml-1">
+                                {messageReadStatus.get(message.id) ? (
+                                  // 🔵 Two blue ticks = read
+                                  <div className="flex space-x-0.5">
+                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  // ⚪ One gray tick = sent but not read
+                                  <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                       {message.type === "image" && message.content && (
@@ -2943,10 +3080,31 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             style={{ maxWidth: 240, maxHeight: 320 }}
                             onClick={() => setPreviewImage(message.content)}
                           />
-                          <div className="flex items-center justify-end">
-                            <span className="chat-message-timestamp">
+                          <div className="flex items-center justify-end space-x-1">
+                            <span className="chat-message-timestamp text-xs">
                               {message.timestamp}
                             </span>
+                            {/* 🔥 NEW: Read receipts with ticks for images */}
+                            {message.senderId === "me" && (
+                              <div className="flex items-center ml-1">
+                                {messageReadStatus.get(message.id) ? (
+                                  // 🔵 Two blue ticks = read
+                                  <div className="flex space-x-0.5">
+                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  // ⚪ One gray tick = sent but not read
+                                  <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2966,10 +3124,31 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                               <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-end">
-                            <span className="chat-message-timestamp">
+                          <div className="flex items-center justify-end space-x-1">
+                            <span className="chat-message-timestamp text-xs">
                               {message.timestamp}
                             </span>
+                            {/* 🔥 NEW: Read receipts with ticks for files */}
+                            {message.senderId === "me" && (
+                              <div className="flex items-center ml-1">
+                                {messageReadStatus.get(message.id) ? (
+                                  // 🔵 Two blue ticks = read
+                                  <div className="flex space-x-0.5">
+                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  // ⚪ One gray tick = sent but not read
+                                  <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

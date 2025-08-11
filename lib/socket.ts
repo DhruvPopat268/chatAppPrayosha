@@ -134,7 +134,7 @@ class SocketManager {
     this.socket.on('message_error', callback)
   }
 
-  // Send typing indicator
+  // Send typing indicators
   sendTypingStart(receiverId: string) {
     if (!this.socket || !this.isConnected) return
 
@@ -145,6 +145,22 @@ class SocketManager {
     if (!this.socket || !this.isConnected) return
 
     this.socket.emit('typing_stop', { receiverId })
+  }
+
+  // 🔥 NEW: Send chat opened event for read receipts
+  sendChatOpened(senderId: string) {
+    if (!this.socket || !this.isConnected) return
+
+    console.log(`📖 Sending chat_opened event for sender: ${senderId}`)
+    this.socket.emit('chat_opened', { senderId })
+  }
+
+  // 🔥 NEW: Request read receipts after reconnection
+  requestReadReceipts(lastSeen: number) {
+    if (!this.socket || !this.isConnected) return
+
+    console.log(`📖 Requesting read receipts since: ${new Date(lastSeen).toISOString()}`)
+    this.socket.emit('request_read_receipts', { lastSeen })
   }
 
   // Listen for typing indicators
@@ -160,6 +176,35 @@ class SocketManager {
     this.socket.on('user_stopped_typing', callback)
   }
 
+  // 🔥 NEW: Listen for read receipts
+  onMessagesReadByReceiver(callback: (data: { 
+    receiverId: string, 
+    messageCount: number, 
+    timestamp: Date,
+    isOfflineUpdate?: boolean 
+  }) => void) {
+    if (!this.socket) return
+
+    this.socket.on('messages_read_by_receiver', callback)
+  }
+
+  // 🔥 NEW: Listen for chat opened confirmation
+  onChatOpenedConfirmation(callback: (data: { 
+    senderId: string, 
+    messageCount: number 
+  }) => void) {
+    if (!this.socket) return
+
+    this.socket.on('chat_opened_confirmation', callback)
+  }
+
+  // 🔥 NEW: Listen for chat opened errors
+  onChatOpenedError(callback: (error: string) => void) {
+    if (!this.socket) return
+
+    this.socket.on('chat_opened_error', callback)
+  }
+
   // Remove all listeners
   removeAllListeners() {
     if (!this.socket) return
@@ -169,6 +214,10 @@ class SocketManager {
     this.socket.removeAllListeners('message_error')
     this.socket.removeAllListeners('user_typing')
     this.socket.removeAllListeners('user_stopped_typing')
+    // 🔥 NEW: Remove read receipt listeners
+    this.socket.removeAllListeners('messages_read_by_receiver')
+    this.socket.removeAllListeners('chat_opened_confirmation')
+    this.socket.removeAllListeners('chat_opened_error')
   }
 
   // Get connection status for debugging
