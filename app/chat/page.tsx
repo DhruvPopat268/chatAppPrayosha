@@ -961,11 +961,26 @@ export default function ChatPage() {
         return msg;
       }));
 
-      // Update the message read status state
+      // Update the message read status state immediately
       setMessageReadStatus(prev => {
+        console.log('📖 Updating messageReadStatus in onMessagesReadByReceiver');
+        console.log('📖 Previous messageReadStatus:', prev);
+        console.log('📖 Current messages:', messages);
+        console.log('📖 Data received:', data);
+        
         const newStatus = new Map(prev);
-        // Mark only messages sent to this specific receiver as read
-        // We'll update this based on the updated messages state
+        // Find all messages sent by current user to this receiver and mark them as read
+        let updatedCount = 0;
+        messages.forEach(msg => {
+          if (msg.senderId === "me" && msg.receiverId === data.receiverId) {
+            newStatus.set(msg.id, true);
+            updatedCount++;
+            console.log(`📖 Marked message ${msg.id} as read`);
+          }
+        });
+        
+        console.log(`📖 Updated ${updatedCount} messages in messageReadStatus`);
+        console.log('📖 New messageReadStatus:', newStatus);
         return newStatus;
       });
       
@@ -1031,6 +1046,15 @@ export default function ChatPage() {
           isRead: false
         }
         setMessages(prev => [...prev, newMessage])
+
+        // 🔥 If the chat is open and the message is from the selected contact, mark as read
+        if (
+          senderId === selectedContact.id &&
+          document.visibilityState === 'visible'
+        ) {
+          console.log('📖 Chat is open and visible, re-emitting chat_opened for real-time read receipt');
+          socketManager.sendChatOpened(selectedContact.id);
+        }
       }
 
       // Update contact's last message
@@ -1765,9 +1789,13 @@ export default function ChatPage() {
           console.log(`📖 Selected contact ID: ${selectedContact.id}`);
           console.log(`📖 Current messages loaded:`, messages);
           console.log(`📖 Message read status:`, messageReadStatus);
+          console.log(`📖 Socket connection status:`, socketManager.getConnectionStatus());
           // When we open a chat with someone, we're telling the backend that we want to mark
           // all unread messages FROM that person TO us as read
+          // The backend expects the senderId (the person whose messages we're reading)
           socketManager.sendChatOpened(selectedContact.id);
+        } else {
+          console.log(`❌ Socket not connected, cannot send chat_opened event`);
         }
       }, 100)
 
@@ -1784,12 +1812,18 @@ export default function ChatPage() {
 
   // 🔥 NEW: Sync messageReadStatus with messages state
   useEffect(() => {
+    console.log('🔄 Syncing messageReadStatus with messages state');
+    console.log('📝 Current messages:', messages);
+    console.log('📖 Current messageReadStatus:', messageReadStatus);
+    
     const newMessageReadStatus = new Map<string, boolean>();
     messages.forEach(msg => {
       if (msg.senderId === "me") {
         newMessageReadStatus.set(msg.id, msg.isRead || false);
       }
     });
+    
+    console.log('📖 New messageReadStatus to be set:', newMessageReadStatus);
     setMessageReadStatus(newMessageReadStatus);
   }, [messages]);
 

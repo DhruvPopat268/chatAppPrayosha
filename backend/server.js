@@ -479,6 +479,8 @@ io.on('connection', (socket) => {
         receiverId: message.receiverId,
         isRead: message.isRead
       });
+      console.log(`📝 Message senderId type:`, typeof message.senderId);
+      console.log(`📝 Message receiverId type:`, typeof message.receiverId);
 
       const populatedMessage = await Message.findById(message._id)
         .populate('senderId', 'username')
@@ -583,24 +585,26 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🔥 NEW: Handle chat opened event for read receipts
+    // 🔥 NEW: Handle chat opened event for read receipts
   socket.on('chat_opened', async (data) => {
     try {
       const { senderId } = data; // senderId is the user whose chat was opened
       const currentUserId = socket.userId; // Current user who opened the chat
 
       console.log(`📖 Chat opened: User ${currentUserId} opened chat with ${senderId}`);
+      console.log(`📖 Data received:`, data);
+      console.log(`📖 Socket userId:`, socket.userId);
 
       // Get all unread messages from this sender to the current user
       const Message = require('./models/messageModel');
-      
+
       // Debug: Log the query parameters
       console.log(`🔍 Querying for unread messages:`, {
         senderId: senderId,
         receiverId: currentUserId,
         isRead: false
       });
-      
+
       const unreadMessages = await Message.find({
         senderId: senderId,
         receiverId: currentUserId,
@@ -634,6 +638,9 @@ io.on('connection', (socket) => {
 
         // Notify the sender that their messages have been read
         const senderSocketId = connectedUsers.get(senderId);
+        console.log(`🔍 Looking for sender socket: ${senderId} -> ${senderSocketId}`);
+        console.log(`🔍 Connected users:`, Array.from(connectedUsers.keys()));
+        
         if (senderSocketId) {
           // Sender is online, send real-time update
           io.to(senderSocketId).emit('messages_read_by_receiver', {
