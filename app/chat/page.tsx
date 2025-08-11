@@ -946,12 +946,12 @@ export default function ChatPage() {
     socketManager.onMessagesReadByReceiver((data) => {
       console.log('📖 Messages read by receiver:', data);
       console.log('📖 Type of data.timestamp:', typeof data.timestamp, data.timestamp); // Debugging line
-      
+
       // Ensure timestamp is a Date object before calling getTime()
-      const timestampAsDate = typeof data.timestamp === 'string' 
-        ? new Date(data.timestamp) 
+      const timestampAsDate = typeof data.timestamp === 'string'
+        ? new Date(data.timestamp)
         : data.timestamp;
-      
+
       // Our messages were read by someone else
       // Update the read status for all messages sent to this receiver
       setMessages(prev => prev.map(msg => {
@@ -967,7 +967,7 @@ export default function ChatPage() {
         console.log('📖 Previous messageReadStatus:', prev);
         console.log('📖 Current messages:', messages);
         console.log('📖 Data received:', data);
-        
+
         const newStatus = new Map(prev);
         // Find all messages sent by current user to this receiver and mark them as read
         let updatedCount = 0;
@@ -978,12 +978,12 @@ export default function ChatPage() {
             console.log(`📖 Marked message ${msg.id} as read`);
           }
         });
-        
+
         console.log(`📖 Updated ${updatedCount} messages in messageReadStatus`);
         console.log('📖 New messageReadStatus:', newStatus);
         return newStatus;
       });
-      
+
       // Store the timestamp of when our messages were read
       setLastReadReceipts(prev => {
         const newReceipts = new Map(prev);
@@ -1247,13 +1247,13 @@ export default function ChatPage() {
       try {
         console.log('📡 Fetching messages after reconnection...');
         await loadMessages(selectedContact.id);
-        
+
         // 🔥 NEW: Request read receipts for messages sent while offline
         if (lastSeen && socketManager.isSocketConnected()) {
           console.log('📖 Requesting read receipts since offline...');
           socketManager.requestReadReceipts(lastSeen);
         }
-        
+
         setWasOffline(false);
         setShowReconnectPopup(false);
       } catch (error) {
@@ -1494,14 +1494,14 @@ export default function ChatPage() {
     };
 
     setMessages(prev => [...prev, message]);
-    
+
     // 🔥 NEW: Update message read status state
     setMessageReadStatus(prev => {
       const newStatus = new Map(prev);
       newStatus.set(message.id, false);
       return newStatus;
     });
-    
+
     setNewMessage("");
 
     // Update contact's last message
@@ -1533,7 +1533,7 @@ export default function ChatPage() {
 
   const handleFileUpload = (type: "image" | "file") => {
     if (!selectedContact) return;
-    
+
     const message: Message = {
       id: Date.now().toString(),
       senderId: "me",
@@ -1547,7 +1547,7 @@ export default function ChatPage() {
     }
 
     setMessages([...messages, message])
-    
+
     // 🔥 NEW: Update message read status state
     setMessageReadStatus(prev => {
       const newStatus = new Map(prev);
@@ -1663,7 +1663,7 @@ export default function ChatPage() {
 
         console.log('✅ Formatted messages:', formattedMessages)
         setMessages(formattedMessages)
-        
+
         // 🔥 NEW: Update message read status state
         const newMessageReadStatus = new Map<string, boolean>();
         formattedMessages.forEach(msg => {
@@ -1672,7 +1672,7 @@ export default function ChatPage() {
           }
         });
         setMessageReadStatus(newMessageReadStatus);
-        
+
         setMessagesReady(true) // Mark messages as ready
       } else {
         console.error('Failed to load messages')
@@ -1781,7 +1781,7 @@ export default function ChatPage() {
       // Add a small delay to ensure currentUser is fully set
       const timer = setTimeout(() => {
         loadMessages(selectedContact.id)
-        
+
         // 🔥 NEW: Send chat opened event to mark messages as read
         if (socketManager.isSocketConnected()) {
           console.log(`📖 Sending chat_opened event for contact: ${selectedContact.id}`);
@@ -1815,14 +1815,14 @@ export default function ChatPage() {
     console.log('🔄 Syncing messageReadStatus with messages state');
     console.log('📝 Current messages:', messages);
     console.log('📖 Current messageReadStatus:', messageReadStatus);
-    
+
     const newMessageReadStatus = new Map<string, boolean>();
     messages.forEach(msg => {
       if (msg.senderId === "me") {
         newMessageReadStatus.set(msg.id, msg.isRead || false);
       }
     });
-    
+
     console.log('📖 New messageReadStatus to be set:', newMessageReadStatus);
     setMessageReadStatus(newMessageReadStatus);
   }, [messages]);
@@ -1885,14 +1885,14 @@ export default function ChatPage() {
         isRead: false
       };
       setMessages(prev => [...prev, message]);
-      
+
       // 🔥 NEW: Update message read status state for image
       setMessageReadStatus(prev => {
         const newStatus = new Map(prev);
         newStatus.set(message.id, false);
         return newStatus;
       });
-      
+
       setNewMessage("");
     }
   };
@@ -1919,14 +1919,14 @@ export default function ChatPage() {
         isRead: false
       };
       setMessages(prev => [...prev, message]);
-      
+
       // 🔥 NEW: Update message read status state for file
       setMessageReadStatus(prev => {
         const newStatus = new Map(prev);
         newStatus.set(message.id, false);
         return newStatus;
       });
-      
+
       setNewMessage("");
     }
   };
@@ -3099,13 +3099,139 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 </div>
               ) : (
                 messages.map((message) => (
+                  // <div
+                  //   key={message.id}
+                  //   className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
+                  // >
+                  //   <div
+                  //     className={cn(
+                  //       "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative",
+                  //       message.senderId === "me"
+                  //         ? "bg-blue-500 text-white rounded-br-md"
+                  //         : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
+                  //     )}
+                  //   >
+                  //     {message.type === "text" && (
+                  //       <div className="relative">
+                  //         <p className="chat-message-text text-sm pr-12">{message.content}</p>
+                  //         <div className="flex items-center justify-end space-x-1 mt-1">
+                  //           <span className="chat-message-timestamp text-xs">
+                  //             {message.timestamp}
+                  //           </span>
+                  //           {/* 🔥 NEW: Read receipts with ticks */}
+                  //           {message.senderId === "me" && (
+                  //             <div className="flex items-center ml-1">
+                  //               {messageReadStatus.get(message.id) ? (
+                  //                 // ⚫ Two black ticks = read
+                  //                 <div className="flex space-x-0.5">
+                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                   </svg>
+                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                   </svg>
+                  //                 </div>
+                  //               ) : (
+                  //                 // ⚫ One black tick = sent but not read
+                  //                 <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                 </svg>
+                  //               )}
+                  //             </div>
+                  //           )}
+                  //         </div>
+                  //       </div>
+                  //     )}
+                  //     {message.type === "image" && message.content && (
+                  //       <div className="space-y-2">
+                  //         <img
+                  //           src={message.content}
+                  //           alt="Shared image"
+                  //           className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                  //           style={{ maxWidth: 240, maxHeight: 320 }}
+                  //           onClick={() => setPreviewImage(message.content)}
+                  //         />
+                  //         <div className="flex items-center justify-end space-x-1">
+                  //           <span className="chat-message-timestamp text-xs">
+                  //             {message.timestamp}
+                  //           </span>
+                  //           {/* 🔥 NEW: Read receipts with ticks for images */}
+                  //           {message.senderId === "me" && (
+                  //             <div className="flex items-center ml-1">
+                  //               {messageReadStatus.get(message.id) ? (
+                  //                 // ⚫ Two black ticks = read
+                  //                 <div className="flex space-x-0.5">
+                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                   </svg>
+                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                   </svg>
+                  //                 </div>
+                  //               ) : (
+                  //                 // ⚫ One black tick = sent but not read
+                  //                 <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                 </svg>
+                  //               )}
+                  //             </div>
+                  //           )}
+                  //         </div>
+                  //       </div>
+                  //     )}
+                  //     {message.type === "file" && message.content && (
+                  //       <div className="space-y-2">
+                  //         <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+                  //           <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
+                  //           <div className="min-w-0 flex-1">
+                  //             <a
+                  //               href={message.content}
+                  //               target="_blank"
+                  //               rel="noopener noreferrer"
+                  //               className="text-sm font-medium underline hover:no-underline block truncate"
+                  //             >
+                  //               {message.fileName || 'Download file'}
+                  //             </a>
+                  //             <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
+                  //           </div>
+                  //         </div>
+                  //         <div className="flex items-center justify-end space-x-1">
+                  //           <span className="chat-message-timestamp text-xs">
+                  //             {message.timestamp}
+                  //           </span>
+                  //           {/* 🔥 NEW: Read receipts with ticks for files */}
+                  //           {message.senderId === "me" && (
+                  //             <div className="flex items-center ml-1">
+                  //               {messageReadStatus.get(message.id) ? (
+                  //                 // ⚫ Two black ticks = read
+                  //                 <div className="flex space-x-0.5">
+                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                   </svg>
+                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                   </svg>
+                  //                 </div>
+                  //               ) : (
+                  //                 // ⚫ One black tick = sent but not read
+                  //                 <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                  //                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  //                 </svg>
+                  //               )}
+                  //             </div>
+                  //           )}
+                  //         </div>
+                  //       </div>
+                  //     )}
+                  //   </div>
+                  // </div>
                   <div
                     key={message.id}
                     className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
                   >
                     <div
                       className={cn(
-                        "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative",
+                        "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative max-w-xs",
                         message.senderId === "me"
                           ? "bg-blue-500 text-white rounded-br-md"
                           : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
@@ -3113,33 +3239,36 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     >
                       {message.type === "text" && (
                         <div className="relative">
-                          <p className="chat-message-text text-sm pr-12">{message.content}</p>
-                          <div className="flex items-center justify-end space-x-1 mt-1">
-                            <span className="chat-message-timestamp text-xs">
-                              {message.timestamp}
-                            </span>
-                            {/* 🔥 NEW: Read receipts with ticks */}
-                            {message.senderId === "me" && (
-                              <div className="flex items-center ml-1">
-                                {messageReadStatus.get(message.id) ? (
-                                  // ⚫ Two black ticks = read
-                                  <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                          <div className="inline">
+                            <span className="text-sm">{message.content}</span>
+                            <div className="inline-flex items-center ml-2 float-right mt-0.5">
+                              <span className={cn(
+                                "text-xs",
+                                message.senderId === "me" ? "text-white/70" : "text-gray-500"
+                              )}>
+                                {message.timestamp}
+                              </span>
+                              {message.senderId === "me" && (
+                                <div className="flex items-center ml-1">
+                                  {messageReadStatus.get(message.id) ? (
+                                    <div className="flex space-x-0.5">
+                                      <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                      <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  // ⚫ One black tick = sent but not read
-                                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                            )}
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
+                          <div className="clear-both"></div>
                         </div>
                       )}
                       {message.type === "image" && message.content && (
@@ -3152,25 +3281,25 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             onClick={() => setPreviewImage(message.content)}
                           />
                           <div className="flex items-center justify-end space-x-1">
-                            <span className="chat-message-timestamp text-xs">
+                            <span className={cn(
+                              "text-xs",
+                              message.senderId === "me" ? "text-white/70" : "text-gray-500"
+                            )}>
                               {message.timestamp}
                             </span>
-                            {/* 🔥 NEW: Read receipts with ticks for images */}
                             {message.senderId === "me" && (
                               <div className="flex items-center ml-1">
                                 {messageReadStatus.get(message.id) ? (
-                                  // ⚫ Two black ticks = read
                                   <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
                                   </div>
                                 ) : (
-                                  // ⚫ One black tick = sent but not read
-                                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                  <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
@@ -3196,25 +3325,25 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             </div>
                           </div>
                           <div className="flex items-center justify-end space-x-1">
-                            <span className="chat-message-timestamp text-xs">
+                            <span className={cn(
+                              "text-xs",
+                              message.senderId === "me" ? "text-white/70" : "text-gray-500"
+                            )}>
                               {message.timestamp}
                             </span>
-                            {/* 🔥 NEW: Read receipts with ticks for files */}
                             {message.senderId === "me" && (
                               <div className="flex items-center ml-1">
                                 {messageReadStatus.get(message.id) ? (
-                                  // ⚫ Two black ticks = read
                                   <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
                                   </div>
                                 ) : (
-                                  // ⚫ One black tick = sent but not read
-                                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
+                                  <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
