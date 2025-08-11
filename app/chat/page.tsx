@@ -3794,22 +3794,6 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => {
-                  console.log('End call button clicked, webrtcManager:', !!webrtcManager);
-                  if (webrtcManager) {
-                    webrtcManager.endCall();
-                  } else {
-                    console.error('WebRTC manager not available for end call');
-                  }
-                }}
-                className="video-call-control-button bg-red-500 text-white hover:bg-red-600"
-              >
-                <PhoneOff className="h-8 w-8" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="lg"
                 onClick={async () => {
                   if (webrtcManager) {
                     if (typeof webrtcManager.toggleCamera === 'function') {
@@ -3826,6 +3810,24 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               >
                 <Camera className="h-8 w-8" />
               </Button>
+
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  console.log('End call button clicked, webrtcManager:', !!webrtcManager);
+                  if (webrtcManager) {
+                    webrtcManager.endCall();
+                  } else {
+                    console.error('WebRTC manager not available for end call');
+                  }
+                }}
+                className="video-call-control-button bg-red-500 text-white hover:bg-red-600"
+              >
+                <PhoneOff className="h-8 w-8" />
+              </Button>
+
+
             </div>
           </div>
         </div>
