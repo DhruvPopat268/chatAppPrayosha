@@ -76,16 +76,19 @@ router.post("/login", async (req, res) => {
 router.put("/profile", verifyAdminToken, async (req, res) => {
   const { username, password, currentPassword } = req.body;
   
-  if (!username || !password || !currentPassword) {
-    return res.status(400).json({ error: "Username, new password, and current password are required" });
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username and new password are required" });
   }
   
   try {
     const admin = req.admin; // From middleware
     
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
-    if (!isCurrentPasswordValid) {
-      return res.status(400).json({ error: "Current password is incorrect" });
+    // Only verify current password if it's provided
+    if (currentPassword) {
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
     }
     
     // Check if new username is already taken by another admin

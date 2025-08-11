@@ -334,7 +334,7 @@ export async function updateUser(userId: string, data: Partial<User>): Promise<{
 export async function updateAdminProfile(data: {
   username: string;
   password: string;
-  currentPassword: string;
+  currentPassword?: string; // Made optional
 }): Promise<{ success?: boolean; error?: string; admin?: { id: string; username: string } }> {
   try {
     // Get admin token from localStorage

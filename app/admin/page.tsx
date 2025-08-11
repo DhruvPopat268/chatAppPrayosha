@@ -213,8 +213,8 @@ export default function AdminDashboard() {
   }
 
   const handleUpdateProfile = async () => {
-    if (!editProfileData.username || !editProfileData.password || !editProfileData.currentPassword) {
-      alert("Please fill in all fields")
+    if (!editProfileData.username || !editProfileData.password) {
+      alert("Please fill in username and new password")
       return
     }
 
@@ -583,12 +583,12 @@ export default function AdminDashboard() {
             </div>
             
             <div>
-              <Label htmlFor="edit-current-password">Current Password *</Label>
+              <Label htmlFor="edit-current-password">Current Password (Optional)</Label>
               <div className="relative">
                 <Input
                   id="edit-current-password"
                   type={showCurrentPassword ? "text" : "password"}
-                  placeholder="Enter current password"
+                  placeholder="Enter current password (optional)"
                   value={editProfileData.currentPassword}
                   onChange={(e) => setEditProfileData({ ...editProfileData, currentPassword: e.target.value })}
                 />
