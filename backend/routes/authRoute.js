@@ -241,6 +241,24 @@ router.delete("/:id", isAdmin, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// Update username (admin only)
+router.put('/:id', isAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ error: 'Username is required' });
+  try {
+    // Check if username already exists for another user
+    const existing = await User.findOne({ username, _id: { $ne: id } });
+    if (existing) return res.status(400).json({ error: 'Username already taken' });
+    const updated = await User.findByIdAndUpdate(id, { username }, { new: true });
+    if (!updated) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, user: { id: updated._id, username: updated.username } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
   
 
 module.exports = router;

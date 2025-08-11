@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { UserPlus, Trash2, Users, Shield, LogOut, Search, Eye, EyeOff } from "lucide-react"
-import { getCurrentAdmin, signOutAdmin, getAllUsers, createUser, deleteUser } from "@/lib/admin-auth"
+import { UserPlus, Trash2, Users, Shield, LogOut, Search, Eye, EyeOff, Edit2 } from "lucide-react"
+import { getCurrentAdmin, signOutAdmin, getAllUsers, createUser, deleteUser, updateUser } from "@/lib/admin-auth"
 
 interface User {
   id: string
@@ -53,6 +53,9 @@ export default function AdminDashboard() {
   const [showPassword, setShowPassword] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
   const [isMobileView, setIsMobileView] = useState(false)
+  const [editUserId, setEditUserId] = useState<string | null>(null)
+  const [editUsername, setEditUsername] = useState("")
+  const [editLoading, setEditLoading] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -157,6 +160,30 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleEditUser = (user: User) => {
+    setEditUserId(user.id)
+    setEditUsername(user.username)
+  }
+  const handleUpdateUser = async () => {
+    if (!editUserId || !editUsername) return
+    setEditLoading(true)
+    try {
+      const result = await updateUser(editUserId, { username: editUsername })
+      if (result.error) {
+        alert(result.error)
+        return
+      }
+      await loadUsers()
+      setEditUserId(null)
+      setEditUsername("")
+      alert("Username updated successfully!")
+    } catch {
+      alert("Failed to update username")
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
   const filteredUsers = users.filter(
     (user) =>
       user.username.toLowerCase().includes(searchQuery.toLowerCase())
@@ -206,10 +233,35 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-        <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
-          <span>Created: {new Date(user.createdAt).toLocaleDateString()}</span>
-        </div>
-        <div className="flex justify-end">
+        <div className="flex gap-2">
+          {/* Edit Button */}
+          <Dialog open={editUserId === user.id} onOpenChange={(open) => { if (!open) setEditUserId(null) }}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
+                <Edit2 className="h-4 w-4 text-blue-500" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Username</DialogTitle>
+              </DialogHeader>
+              <Input
+                value={editUsername}
+                onChange={e => setEditUsername(e.target.value)}
+                placeholder="Enter new username"
+                className="mb-4"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditUserId(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateUser} disabled={editLoading}>
+                  {editLoading ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          {/* Delete Button */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="sm">
@@ -234,6 +286,9 @@ export default function AdminDashboard() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+        </div>
+        <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
+          <span>Created: {new Date(user.createdAt).toLocaleDateString()}</span>
         </div>
       </CardContent>
     </Card>
@@ -341,7 +396,35 @@ export default function AdminDashboard() {
                           </div>
                         </TableCell>
                         <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>
+                        <TableCell className="flex gap-2">
+                          {/* Edit Button */}
+                          <Dialog open={editUserId === user.id} onOpenChange={(open) => { if (!open) setEditUserId(null) }}>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
+                                <Edit2 className="h-4 w-4 text-blue-500" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Edit Username</DialogTitle>
+                              </DialogHeader>
+                              <Input
+                                value={editUsername}
+                                onChange={e => setEditUsername(e.target.value)}
+                                placeholder="Enter new username"
+                                className="mb-4"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button variant="outline" onClick={() => setEditUserId(null)}>
+                                  Cancel
+                                </Button>
+                                <Button onClick={handleUpdateUser} disabled={editLoading}>
+                                  {editLoading ? "Saving..." : "Save"}
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          {/* Delete Button */}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="sm">

@@ -286,15 +286,23 @@ export async function deleteUser(userId: string): Promise<{ success?: boolean; e
 }
 
 export async function updateUser(userId: string, data: Partial<User>): Promise<{ success?: boolean; error?: string }> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-
-  const userIndex = users.findIndex((user) => user.id === userId)
-
-  if (userIndex === -1) {
-    return { error: "User not found" }
+  try {
+    const token = localStorage.getItem('user_token');
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin': 'true',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      return { error: result.error || 'User update failed' };
+    }
+    return { success: true };
+  } catch (error) {
+    return { error: 'User update failed. Please try again.' };
   }
-
-  users[userIndex] = { ...users[userIndex], ...data }
-  return { success: true }
 }
