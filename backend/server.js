@@ -15,7 +15,7 @@ const messageRoutes = require("./routes/messageRoute");
 const adminAuthRoutes = require("./routes/adminAuthRoute");
 const User = require('./models/authModel');
 const Session = require('./models/sessionModel');
-const { cleanupExpiredSessions } = require('./utils/sessionUtils');
+const { cleanupExpiredSessions, forceCleanupOldSessions } = require('./utils/sessionUtils');
 
 const app = express();
 const server = http.createServer(app);
@@ -940,9 +940,14 @@ mongoose.connect(process.env.MONGO_URI)
       console.log(`🔌 Socket.IO server ready`);
     });
     
-    // Set up session cleanup job (run every 6 hours)
-    setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
-    console.log("🧹 Session cleanup job scheduled");
+    // Enhanced session cleanup scheduling for 1-day TTL
+    // Cleanup every 30 minutes (more frequent since TTL is now 1 day)
+    setInterval(cleanupExpiredSessions, 30 * 60 * 1000);
+    console.log("🧹 Session cleanup job scheduled (every 30 minutes)");
+    
+    // Force cleanup every 2 hours to manually delete old sessions
+    setInterval(forceCleanupOldSessions, 2 * 60 * 60 * 1000);
+    console.log("🧹 Force cleanup job scheduled (every 2 hours)");
 
     // Ensure TTL indexes are in place for messages (auto-delete after 1 hour)
     try {

@@ -127,4 +127,21 @@ router.get("/validate", verifyAdminToken, async (req, res) => {
   }
 });
 
+// Manual session cleanup trigger (admin only)
+router.post("/cleanup-sessions", verifyAdminToken, async (req, res) => {
+  try {
+    const { forceCleanup } = require('../utils/sessionUtils');
+    const deletedCount = await forceCleanup();
+    
+    res.json({ 
+      success: true, 
+      message: "Session cleanup completed",
+      deletedCount 
+    });
+  } catch (err) {
+    console.error('Error triggering cleanup:', err);
+    res.status(500).json({ error: "Failed to trigger cleanup" });
+  }
+});
+
 module.exports = router; 
