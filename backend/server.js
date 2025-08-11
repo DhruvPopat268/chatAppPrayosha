@@ -439,6 +439,9 @@ io.on('connection', (socket) => {
       // Broadcast to ALL users that this user is online
       io.emit('user_status', { userId, online: true });
       console.log(`User ${userId} authenticated and connected. Connected users:`, Array.from(connectedUsers.keys()));
+      
+      // 🔥 NEW: Send authentication success event
+      socket.emit('authenticated', { userId });
     } catch (error) {
       console.error('Authentication failed:', error);
       socket.emit('auth_error', 'Authentication failed');
@@ -449,6 +452,15 @@ io.on('connection', (socket) => {
   socket.on('send_message', async (data) => {
     try {
       const { receiverId, content, type, fileName, fileSize } = data;
+      
+      console.log(`📝 Sending message:`, {
+        senderId: socket.userId,
+        receiverId,
+        content: content.substring(0, 50),
+        type: type || 'text',
+        fileName,
+        fileSize
+      });
 
       // Save message to database
       const Message = require('./models/messageModel');
@@ -459,6 +471,13 @@ io.on('connection', (socket) => {
         type: type || 'text',
         fileName,
         fileSize
+      });
+      
+      console.log(`📝 Message created in DB:`, {
+        _id: message._id,
+        senderId: message.senderId,
+        receiverId: message.receiverId,
+        isRead: message.isRead
       });
 
       const populatedMessage = await Message.findById(message._id)
@@ -574,17 +593,33 @@ io.on('connection', (socket) => {
 
       // Get all unread messages from this sender to the current user
       const Message = require('./models/messageModel');
+      
+      // Debug: Log the query parameters
+      console.log(`🔍 Querying for unread messages:`, {
+        senderId: senderId,
+        receiverId: currentUserId,
+        isRead: false
+      });
+      
       const unreadMessages = await Message.find({
         senderId: senderId,
         receiverId: currentUserId,
         isRead: false
       });
 
+      console.log(`🔍 Found ${unreadMessages.length} unread messages:`, unreadMessages.map(m => ({
+        _id: m._id,
+        senderId: m.senderId,
+        receiverId: m.receiverId,
+        content: m.content.substring(0, 50),
+        isRead: m.isRead
+      })));
+
       if (unreadMessages.length > 0) {
         console.log(`📖 Marking ${unreadMessages.length} messages as read from ${senderId} to ${currentUserId}`);
 
         // Mark all unread messages as read
-        await Message.updateMany(
+        const updateResult = await Message.updateMany(
           {
             senderId: senderId,
             receiverId: currentUserId,
@@ -594,6 +629,8 @@ io.on('connection', (socket) => {
             $set: { isRead: true }
           }
         );
+        
+        console.log(`📖 Update result:`, updateResult);
 
         // Notify the sender that their messages have been read
         const senderSocketId = connectedUsers.get(senderId);

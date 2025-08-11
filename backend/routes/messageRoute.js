@@ -23,15 +23,9 @@ router.get('/:receiverId', async (req, res) => {
     .populate('receiverId', 'username')
     .lean();
 
-    // Mark messages as read
-    await Message.updateMany(
-      {
-        senderId: receiverId,
-        receiverId: req.user._id,
-        isRead: false
-      },
-      { isRead: true }
-    );
+    // 🔥 REMOVED: Automatic marking as read - let socket system handle read receipts
+    // This prevents conflicts between API and socket-based read receipt systems
+    console.log(`📖 API: Messages loaded, read status will be handled by socket system`);
 
     res.json(messages.reverse()); // Return in chronological order
   } catch (err) {

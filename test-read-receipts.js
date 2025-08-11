@@ -1,111 +1,89 @@
-// 🧪 Read Receipts Test Script
-// Run this in your browser console to test read receipts functionality
+const io = require('socket.io-client');
 
-console.log('🧪 Read Receipts Test Script Loaded');
+// Test configuration
+const BACKEND_URL = 'http://localhost:5000';
+const USER1_TOKEN = 'your_user1_jwt_token_here';
+const USER2_TOKEN = 'your_user2_jwt_token_here';
 
-// Test functions
-const testReadReceipts = {
-  // Check if socket is connected
-  checkSocketConnection: () => {
-    const socket = window.socketManager?.getSocket();
-    if (socket) {
-      console.log('✅ Socket connected:', socket.connected);
-      console.log('🔌 Socket ID:', socket.id);
-      return true;
-    } else {
-      console.log('❌ Socket not available');
-      return false;
-    }
-  },
+// Test users (replace with actual user IDs from your database)
+const USER1_ID = 'user1_id_here';
+const USER2_ID = 'user2_id_here';
 
-  // Check current user
-  checkCurrentUser: () => {
-    const user = window.getCurrentUser?.();
-    if (user) {
-      console.log('✅ Current user:', user);
-      return user;
-    } else {
-      console.log('❌ No current user found');
-      return null;
-    }
-  },
+async function testReadReceipts() {
+  console.log('🧪 Starting read receipt test...');
 
-  // Check selected contact
-  checkSelectedContact: () => {
-    // This depends on your React component state
-    console.log('ℹ️ Check the selected contact in the UI');
-    return null;
-  },
+  // Create socket connections for both users
+  const user1Socket = io(BACKEND_URL);
+  const user2Socket = io(BACKEND_URL);
 
-  // Test sending chat_opened event
-  testChatOpened: (contactId) => {
-    if (!contactId) {
-      console.log('❌ Please provide a contact ID');
-      return;
-    }
+  // Connect and authenticate user 1
+  user1Socket.on('connect', () => {
+    console.log('✅ User 1 connected');
+    user1Socket.emit('authenticate', USER1_TOKEN);
+  });
 
-    if (window.socketManager?.isSocketConnected()) {
-      console.log(`📖 Testing chat_opened event for contact: ${contactId}`);
-      window.socketManager.sendChatOpened(contactId);
-      console.log('✅ chat_opened event sent');
-    } else {
-      console.log('❌ Socket not connected');
-    }
-  },
+  user1Socket.on('authenticated', () => {
+    console.log('✅ User 1 authenticated');
+  });
 
-  // Test read receipts request
-  testReadReceiptsRequest: (lastSeen) => {
-    if (!lastSeen) {
-      lastSeen = Date.now() - (5 * 60 * 1000); // 5 minutes ago
-    }
+  // Connect and authenticate user 2
+  user2Socket.on('connect', () => {
+    console.log('✅ User 2 connected');
+    user2Socket.emit('authenticate', USER2_TOKEN);
+  });
 
-    if (window.socketManager?.isSocketConnected()) {
-      console.log(`📖 Testing read receipts request since: ${new Date(lastSeen).toISOString()}`);
-      window.socketManager.requestReadReceipts(lastSeen);
-      console.log('✅ read receipts request sent');
-    } else {
-      console.log('❌ Socket not connected');
-    }
-  },
+  user2Socket.on('authenticated', () => {
+    console.log('✅ User 2 authenticated');
+  });
 
-  // Check message read status
-  checkMessageReadStatus: () => {
-    // This depends on your React component state
-    console.log('ℹ️ Check message read status in the UI');
-    console.log('Look for:');
-    console.log('  - Single gray tick (⚪) = sent but not read');
-    console.log('  - Double blue ticks (🔵🔵) = read');
-  },
-
-  // Run all tests
-  runAllTests: () => {
-    console.log('🚀 Running all read receipts tests...');
+  // Test sending a message from user 1 to user 2
+  user1Socket.on('message_sent', (message) => {
+    console.log('📝 Message sent by user 1:', message);
     
-    const socketOk = this.checkSocketConnection();
-    const userOk = this.checkCurrentUser();
-    
-    if (socketOk && userOk) {
-      console.log('✅ Basic setup is working');
-      console.log('📱 Now test by:');
-      console.log('  1. Send a message to another user');
-      console.log('  2. Check that it shows single tick (⚪)');
-      console.log('  3. Have the other user open the chat');
-      console.log('  4. Check that your message now shows double ticks (🔵🔵)');
-    } else {
-      console.log('❌ Setup issues found, fix them first');
-    }
-  }
-};
+    // Wait a bit then simulate user 2 opening the chat
+    setTimeout(() => {
+      console.log(`📖 Testing chat_opened event for contact: ${USER1_ID}`);
+      user2Socket.emit('chat_opened', { senderId: USER1_ID });
+    }, 1000);
+  });
 
-// Make test functions globally available
-window.testReadReceipts = testReadReceipts;
+  // Listen for read receipt on user 1
+  user1Socket.on('messages_read_by_receiver', (data) => {
+    console.log('📖 User 1 received read receipt:', data);
+  });
 
-console.log('📋 Available test functions:');
-console.log('  - testReadReceipts.checkSocketConnection()');
-console.log('  - testReadReceipts.checkCurrentUser()');
-console.log('  - testReadReceipts.testChatOpened(contactId)');
-console.log('  - testReadReceipts.testReadReceiptsRequest(lastSeen)');
-console.log('  - testReadReceipts.checkMessageReadStatus()');
-console.log('  - testReadReceipts.runAllTests()');
-console.log('');
-console.log('💡 Run testReadReceipts.runAllTests() to start testing!');
+  // Listen for chat opened confirmation on user 2
+  user2Socket.on('chat_opened_confirmation', (data) => {
+    console.log('📖 User 2 received chat opened confirmation:', data);
+  });
+
+  // Send a test message from user 1 to user 2
+  setTimeout(() => {
+    console.log('📝 Sending test message from user 1 to user 2...');
+    user1Socket.emit('send_message', {
+      receiverId: USER2_ID,
+      content: 'Test message for read receipts',
+      type: 'text'
+    });
+  }, 2000);
+
+  // Cleanup after test
+  setTimeout(() => {
+    console.log('🧹 Cleaning up test connections...');
+    user1Socket.disconnect();
+    user2Socket.disconnect();
+    process.exit(0);
+  }, 10000);
+}
+
+// Handle errors
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+// Start the test
+testReadReceipts().catch(console.error);
