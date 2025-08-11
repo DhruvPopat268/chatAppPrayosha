@@ -112,7 +112,7 @@ body {
   background: rgba(17, 24, 39, 0.08); /* gray-900 at ~8% */
   color: #6b7280; /* gray-500 */
   border-radius: 9999px;
-  padding: 2px 8px;
+  padding: 4px 8px;
   line-height: 1;
 }
 
