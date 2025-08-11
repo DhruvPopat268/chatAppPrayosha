@@ -63,7 +63,7 @@ export default function AdminDashboard() {
       if (typeof window !== 'undefined') {
         const adminUsername = localStorage.getItem('adminUsername');
         const isLoggedIn = localStorage.getItem('adminLoggedIn');
-        
+
         if (!adminUsername || isLoggedIn !== 'true') {
           router.push('/admin/login');
           return;
@@ -213,12 +213,14 @@ export default function AdminDashboard() {
   }
 
   // Mobile User Card Component
+  // Mobile User Card Component
   const MobileUserCard = ({ user }: { user: User }) => (
     <Card className="mb-4">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
+        <div className="flex items-center justify-between">
+          {/* Left side - Avatar, Username and Created date */}
+          <div className="flex items-center space-x-3 flex-1 min-w-0">
+            <Avatar className="h-10 w-10 flex-shrink-0">
               <AvatarImage src={user.avatar || "/placeholder.svg"} />
               <AvatarFallback>
                 {user.username
@@ -228,67 +230,70 @@ export default function AdminDashboard() {
                   .toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <p className="font-medium text-sm">{user.username}</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-sm truncate">{user.username}</p>
+              <p className="text-xs text-gray-500">
+                Created: {new Date(user.createdAt).toLocaleDateString()}
+              </p>
             </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          {/* Edit Button */}
-          <Dialog open={editUserId === user.id} onOpenChange={(open) => { if (!open) setEditUserId(null) }}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
-                <Edit2 className="h-4 w-4 text-blue-500" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Username</DialogTitle>
-              </DialogHeader>
-              <Input
-                value={editUsername}
-                onChange={e => setEditUsername(e.target.value)}
-                placeholder="Enter new username"
-                className="mb-4"
-              />
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditUserId(null)}>
-                  Cancel
+
+          {/* Right side - Action Buttons */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            {/* Edit Button */}
+            <Dialog open={editUserId === user.id} onOpenChange={(open) => { if (!open) setEditUserId(null) }}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
+                  <Edit2 className="h-4 w-4 text-blue-500" />
                 </Button>
-                <Button onClick={handleUpdateUser} disabled={editLoading}>
-                  {editLoading ? "Saving..." : "Save"}
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Username</DialogTitle>
+                </DialogHeader>
+                <Input
+                  value={editUsername}
+                  onChange={e => setEditUsername(e.target.value)}
+                  placeholder="Enter new username"
+                  className="mb-4"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditUserId(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpdateUser} disabled={editLoading}>
+                    {editLoading ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Delete Button */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          {/* Delete Button */}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <Trash2 className="h-4 w-4 text-red-500" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="mx-4 max-w-sm">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete User</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete user "{user.username}"? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => handleDeleteUser(user.id, user.username)}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-        <div className="flex justify-between items-center text-xs text-gray-500 mb-3">
-          <span>Created: {new Date(user.createdAt).toLocaleDateString()}</span>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="mx-4 max-w-sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete user "{user.username}"? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeleteUser(user.id, user.username)}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </CardContent>
     </Card>
