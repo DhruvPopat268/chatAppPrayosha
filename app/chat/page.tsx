@@ -228,6 +228,7 @@ interface Contact {
 interface Message {
   id: string
   senderId: string
+  receiverId?: string
   content: string
   timestamp: string
   type: "text" | "image" | "file" | "voice"
@@ -945,33 +946,31 @@ export default function ChatPage() {
     socketManager.onMessagesReadByReceiver((data) => {
       console.log('📖 Messages read by receiver:', data);
       
-      if (data.receiverId === currentUser.id) {
-        // Our messages were read by someone else
-        // Update the read status for all messages sent to this receiver
-        setMessages(prev => prev.map(msg => {
-          if (msg.senderId === "me") {
-            return { ...msg, isRead: true };
-          }
-          return msg;
-        }));
-        
-        // Update the message read status state
-        setMessageReadStatus(prev => {
-          const newStatus = new Map(prev);
-          // Mark all messages as read
-          prev.forEach((_, messageId) => {
-            newStatus.set(messageId, true);
-          });
-          return newStatus;
+      // Our messages were read by someone else
+      // Update the read status for all messages sent to this receiver
+      setMessages(prev => prev.map(msg => {
+        if (msg.senderId === "me" && msg.receiverId === data.receiverId) {
+          return { ...msg, isRead: true };
+        }
+        return msg;
+      }));
+
+      // Update the message read status state
+      setMessageReadStatus(prev => {
+        const newStatus = new Map(prev);
+        // Mark all messages sent to this receiver as read
+        prev.forEach((_, messageId) => {
+          newStatus.set(messageId, true);
         });
-        
-        // Store the timestamp of when our messages were read
-        setLastReadReceipts(prev => {
-          const newReceipts = new Map(prev);
-          newReceipts.set(data.receiverId, data.timestamp.getTime());
-          return newReceipts;
-        });
-      }
+        return newStatus;
+      });
+      
+      // Store the timestamp of when our messages were read
+      setLastReadReceipts(prev => {
+        const newReceipts = new Map(prev);
+        newReceipts.set(data.receiverId, data.timestamp.getTime());
+        return newReceipts;
+      });
     });
 
     // 🔥 NEW: Listen for chat opened confirmation
@@ -1019,11 +1018,13 @@ export default function ChatPage() {
         const newMessage: Message = {
           id: message._id,
           senderId: isCurrentUser ? "me" : senderId,
+          receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
           content: message.content,
           timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
           type: message.type || "text",
           fileName: message.fileName,
           fileSize: message.fileSize,
+          isRead: false
         }
         setMessages(prev => [...prev, newMessage])
       }
@@ -1456,6 +1457,7 @@ export default function ChatPage() {
     const message: Message = {
       id: Date.now().toString(),
       senderId: "me",
+      receiverId: selectedContact.id,
       content: newMessage,
       timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
       type: "text",
@@ -1502,17 +1504,28 @@ export default function ChatPage() {
   };
 
   const handleFileUpload = (type: "image" | "file") => {
+    if (!selectedContact) return;
+    
     const message: Message = {
       id: Date.now().toString(),
       senderId: "me",
+      receiverId: selectedContact.id,
       content: "",
       timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
       type: type,
       fileName: type === "file" ? "document.pdf" : undefined,
       fileSize: type === "file" ? "2.4 MB" : undefined,
+      isRead: false
     }
 
     setMessages([...messages, message])
+    
+    // 🔥 NEW: Update message read status state
+    setMessageReadStatus(prev => {
+      const newStatus = new Map(prev);
+      newStatus.set(message.id, false);
+      return newStatus;
+    });
   }
 
   const handleAvatarUpload = () => {
@@ -1609,6 +1622,7 @@ export default function ChatPage() {
           return {
             id: msg._id,
             senderId: isCurrentUser ? "me" : senderId,
+            receiverId: isCurrentUser ? contactId : currentUser.id,
             content: msg.content,
             timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
             type: msg.type || "text",
@@ -1809,6 +1823,7 @@ export default function ChatPage() {
       const message: Message = {
         id: Date.now().toString(),
         senderId: "me",
+        receiverId: selectedContact.id,
         content: url,
         timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
         type: "image",
@@ -1840,6 +1855,7 @@ export default function ChatPage() {
       const message: Message = {
         id: Date.now().toString(),
         senderId: "me",
+        receiverId: selectedContact.id,
         content: url,
         timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
         type: "file",
@@ -3051,18 +3067,18 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             {message.senderId === "me" && (
                               <div className="flex items-center ml-1">
                                 {messageReadStatus.get(message.id) ? (
-                                  // 🔵 Two blue ticks = read
+                                  // ⚫ Two black ticks = read
                                   <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
                                   </div>
                                 ) : (
-                                  // ⚪ One gray tick = sent but not read
-                                  <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                  // ⚫ One black tick = sent but not read
+                                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
@@ -3088,18 +3104,18 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             {message.senderId === "me" && (
                               <div className="flex items-center ml-1">
                                 {messageReadStatus.get(message.id) ? (
-                                  // 🔵 Two blue ticks = read
+                                  // ⚫ Two black ticks = read
                                   <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
                                   </div>
                                 ) : (
-                                  // ⚪ One gray tick = sent but not read
-                                  <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                  // ⚫ One black tick = sent but not read
+                                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
@@ -3132,18 +3148,18 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             {message.senderId === "me" && (
                               <div className="flex items-center ml-1">
                                 {messageReadStatus.get(message.id) ? (
-                                  // 🔵 Two blue ticks = read
+                                  // ⚫ Two black ticks = read
                                   <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
-                                    <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                     </svg>
                                   </div>
                                 ) : (
-                                  // ⚪ One gray tick = sent but not read
-                                  <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                  // ⚫ One black tick = sent but not read
+                                  <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
