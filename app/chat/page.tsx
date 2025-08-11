@@ -3822,10 +3822,9 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   }
                 }}
                 className="video-call-control-button bg-white text-gray-800 hover:bg-gray-200"
-                style={{ marginRight: 8 }}
+                aria-label="Switch Camera"
               >
                 <Camera className="h-8 w-8" />
-                <span className="ml-2">Switch Camera</span>
               </Button>
             </div>
           </div>
