@@ -36,7 +36,8 @@ sessionSchema.index({ userId: 1, isActive: 1 });
 sessionSchema.index({ username: 1, isActive: 1 });
 sessionSchema.index({ token: 1, isActive: 1 });
 
-// Auto-expire sessions after 7 days of inactivity
-sessionSchema.index({ lastActivity: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 });
+// TTL: delete sessions 7 days after creation
+// Uses Mongoose timestamps -> createdAt
+sessionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60, name: 'session_ttl_createdAt_7d' });
 
 module.exports = mongoose.model("Session", sessionSchema); 
