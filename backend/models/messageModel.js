@@ -33,4 +33,8 @@ const messageSchema = new mongoose.Schema({
 // Index for efficient querying of conversations
 messageSchema.index({ senderId: 1, receiverId: 1, createdAt: -1 });
 
+// TTL index: auto-delete messages 1 hour after creation
+// MongoDB TTL monitor runs ~once per minute, so deletions are approximate
+messageSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60, name: 'message_ttl_1h' });
+
 module.exports = mongoose.model("Message", messageSchema); 

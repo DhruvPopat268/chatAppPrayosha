@@ -941,6 +941,14 @@ mongoose.connect(process.env.MONGO_URI)
     // Set up session cleanup job (run every 6 hours)
     setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
     console.log("🧹 Session cleanup job scheduled");
+
+    // Ensure TTL indexes are in place for messages (auto-delete after 1 hour)
+    try {
+      const Message = require('./models/messageModel');
+      Message.syncIndexes().then(() => console.log('🗑️ Message TTL index synced (1h)'));
+    } catch (e) {
+      console.warn('Warning: could not sync Message indexes:', e?.message || e);
+    }
   })
   .catch(err => {
     console.error("❌ MongoDB connection error:", err);
