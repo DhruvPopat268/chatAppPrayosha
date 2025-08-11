@@ -4,6 +4,27 @@ const jwt = require("jsonwebtoken");
 const Admin = require("../models/adminModel");
 const router = express.Router();
 
+// Middleware to verify admin JWT token
+const verifyAdminToken = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: "Access token required" });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const admin = await Admin.findById(decoded.adminId);
+    if (!admin) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    
+    req.admin = admin;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+};
+
 // Admin signup
 router.post("/signup", async (req, res) => {
   const { username, password } = req.body;
@@ -51,8 +72,8 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Update admin profile (username and password)
-router.put("/profile", async (req, res) => {
+// Update admin profile (username and password) - Now uses JWT token
+router.put("/profile", verifyAdminToken, async (req, res) => {
   const { username, password, currentPassword } = req.body;
   
   if (!username || !password || !currentPassword) {
@@ -60,17 +81,7 @@ router.put("/profile", async (req, res) => {
   }
   
   try {
-    // Get admin ID from cookie
-    const adminId = req.cookies.admin_session;
-    if (!adminId) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-    
-    // Find admin and verify current password
-    const admin = await Admin.findById(adminId);
-    if (!admin) {
-      return res.status(404).json({ error: "Admin not found" });
-    }
+    const admin = req.admin; // From middleware
     
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
     if (!isCurrentPasswordValid) {
@@ -98,6 +109,18 @@ router.put("/profile", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Validate admin token
+router.get("/validate", verifyAdminToken, async (req, res) => {
+  try {
+    res.json({ 
+      valid: true, 
+      admin: { id: req.admin._id, username: req.admin.username } 
+    });
+  } catch (err) {
+    res.status(401).json({ valid: false, error: "Invalid token" });
   }
 });
 

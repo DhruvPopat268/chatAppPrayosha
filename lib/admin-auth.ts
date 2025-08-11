@@ -110,6 +110,27 @@ export async function signUpAdmin(data: {
   }
 }
 
+// Validate admin token
+export async function validateAdminToken(): Promise<boolean> {
+  try {
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+      return false;
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin-auth/validate`, {
+      method: "GET",
+      headers: {
+        'Authorization': `Bearer ${adminToken}`
+      }
+    });
+
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
 export async function signInAdmin(username: string, password: string): Promise<{ success?: boolean; error?: string }> {
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin-auth/login`, {
@@ -127,6 +148,7 @@ export async function signInAdmin(username: string, password: string): Promise<{
       localStorage.setItem('adminUsername', username);
       localStorage.setItem('adminLoggedIn', 'true');
       localStorage.setItem('adminLoginTime', new Date().toISOString());
+      localStorage.setItem('adminToken', result.token); // Store JWT token
       
       // Optional: Also set a cookie for additional security
       setCookie(ADMIN_COOKIE_NAME, 'admin-1', COOKIE_MAX_AGE);
@@ -188,6 +210,7 @@ export async function signOutAdmin(): Promise<void> {
     localStorage.removeItem('adminUsername');
     localStorage.removeItem('adminLoggedIn');
     localStorage.removeItem('adminLoginTime');
+    localStorage.removeItem('adminToken'); // Clear JWT token
   }
   
   // Clear cookies
@@ -314,13 +337,19 @@ export async function updateAdminProfile(data: {
   currentPassword: string;
 }): Promise<{ success?: boolean; error?: string; admin?: { id: string; username: string } }> {
   try {
+    // Get admin token from localStorage
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+      return { error: 'Admin token not found. Please login again.' };
+    }
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin-auth/profile`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
       },
-      body: JSON.stringify(data),
-      credentials: 'include' // Include cookies for authentication
+      body: JSON.stringify(data)
     });
     
     const result = await response.json();
