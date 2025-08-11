@@ -3238,49 +3238,9 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                       )}
                     >
                       {message.type === "text" && (
-                        <div className="relative">
-                          <div className="inline">
-                            <span className="text-sm">{message.content}</span>
-                            <div className="inline-flex items-center ml-2 float-right mt-0.5">
-                              <span className={cn(
-                                "text-xs",
-                                message.senderId === "me" ? "text-white/70" : "text-gray-500"
-                              )}>
-                                {message.timestamp}
-                              </span>
-                              {message.senderId === "me" && (
-                                <div className="flex items-center ml-1">
-                                  {messageReadStatus.get(message.id) ? (
-                                    <div className="flex space-x-0.5">
-                                      <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                      <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                      </svg>
-                                    </div>
-                                  ) : (
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="clear-both"></div>
-                        </div>
-                      )}
-                      {message.type === "image" && message.content && (
-                        <div className="space-y-2">
-                          <img
-                            src={message.content}
-                            alt="Shared image"
-                            className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                            style={{ maxWidth: 240, maxHeight: 320 }}
-                            onClick={() => setPreviewImage(message.content)}
-                          />
-                          <div className="flex items-center justify-end space-x-1">
+                        <div className="relative pb-4">
+                          <p className="text-sm pr-14">{message.content}</p>
+                          <div className="absolute bottom-0 right-0 flex items-center space-x-1">
                             <span className={cn(
                               "text-xs",
                               message.senderId === "me" ? "text-white/70" : "text-gray-500"
@@ -3288,7 +3248,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                               {message.timestamp}
                             </span>
                             {message.senderId === "me" && (
-                              <div className="flex items-center ml-1">
+                              <div className="flex items-center">
                                 {messageReadStatus.get(message.id) ? (
                                   <div className="flex space-x-0.5">
                                     <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
@@ -3308,8 +3268,42 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           </div>
                         </div>
                       )}
+                      {message.type === "image" && message.content && (
+                        <div className="relative">
+                          <img
+                            src={message.content}
+                            alt="Shared image"
+                            className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity mb-4"
+                            style={{ maxWidth: 240, maxHeight: 320 }}
+                            onClick={() => setPreviewImage(message.content)}
+                          />
+                          <div className="absolute bottom-0 right-0 flex items-center space-x-1 bg-black/20 rounded px-1 py-0.5">
+                            <span className="text-xs text-white">
+                              {message.timestamp}
+                            </span>
+                            {message.senderId === "me" && (
+                              <div className="flex items-center">
+                                {messageReadStatus.get(message.id) ? (
+                                  <div className="flex space-x-0.5">
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {message.type === "file" && message.content && (
-                        <div className="space-y-2">
+                        <div className="relative pb-4">
                           <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
                             <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
@@ -3324,7 +3318,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                               <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
                             </div>
                           </div>
-                          <div className="flex items-center justify-end space-x-1">
+                          <div className="absolute bottom-0 right-0 flex items-center space-x-1">
                             <span className={cn(
                               "text-xs",
                               message.senderId === "me" ? "text-white/70" : "text-gray-500"
@@ -3332,7 +3326,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                               {message.timestamp}
                             </span>
                             {message.senderId === "me" && (
-                              <div className="flex items-center ml-1">
+                              <div className="flex items-center">
                                 {messageReadStatus.get(message.id) ? (
                                   <div className="flex space-x-0.5">
                                     <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
