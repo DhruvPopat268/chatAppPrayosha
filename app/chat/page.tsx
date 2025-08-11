@@ -2959,13 +2959,11 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 <div>
                   <h3 className="font-medium text-white">{selectedContact?.name || "No Contact"}</h3>
                   <p className="text-xs text-blue-100">
-                    {isTyping
-                      ? "typing..."
-                      : contactStatus.online
-                        ? "online"
-                        : contactStatus.lastSeen
-                          ? `last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
-                          : "offline"}
+                    {contactStatus.online
+                      ? "online"
+                      : contactStatus.lastSeen
+                        ? `last seen ${getOfflineStatusMessage(contactStatus.lastSeen)}`
+                        : "offline"}
                   </p>
 
                 </div>
@@ -3377,7 +3375,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
         {/* Telegram-style Message Input - Always Visible */}
         <div
           className={cn(
-            "bg-white border-t border-gray-200 p-3 flex-shrink-0 shadow-lg z-50 mobile-safe-area",
+            "bg-white border-t border-gray-200 p-3 flex-shrink-0 shadow-lg z-50 mobile-safe-area relative",
             isKeyboardVisible && "fixed bottom-0 left-0 right-0 mobile-input-focus"
           )}
           style={{
@@ -3388,6 +3386,15 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               : `calc(12px + env(safe-area-inset-bottom, 0px))`,
           }}
         >
+          {isTyping && selectedContact && (
+            <div className="absolute -top-5 left-3" aria-live="polite">
+              <div className="typing-indicator" role="status" aria-label="Typing">
+                <span className="typing-indicator-dot" />
+                <span className="typing-indicator-dot" />
+                <span className="typing-indicator-dot" />
+              </div>
+            </div>
+          )}
           <div className="flex items-end space-x-2">
             <Button
               variant="ghost"
