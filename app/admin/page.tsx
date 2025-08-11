@@ -21,10 +21,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { UserPlus, Trash2, Users, Shield, LogOut, Search, Eye, EyeOff, Edit2 } from "lucide-react"
-import { getCurrentAdmin, signOutAdmin, getAllUsers, createUser, deleteUser, updateUser } from "@/lib/admin-auth"
+import { UserPlus, Trash2, Users, Shield, LogOut, Search, Eye, EyeOff, Edit2, MoreVertical } from "lucide-react"
+import { getCurrentAdmin, signOutAdmin, getAllUsers, createUser, deleteUser, updateUser, updateAdminProfile } from "@/lib/admin-auth"
 
 interface User {
   id: string
@@ -56,6 +62,17 @@ export default function AdminDashboard() {
   const [editUserId, setEditUserId] = useState<string | null>(null)
   const [editUsername, setEditUsername] = useState("")
   const [editLoading, setEditLoading] = useState(false)
+  
+  // New state for admin profile editing
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
+  const [editProfileData, setEditProfileData] = useState({
+    username: "",
+    password: "",
+    currentPassword: ""
+  })
+  const [showEditPassword, setShowEditPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [editProfileLoading, setEditProfileLoading] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -181,6 +198,56 @@ export default function AdminDashboard() {
       alert("Failed to update username")
     } finally {
       setEditLoading(false)
+    }
+  }
+
+  const handleEditProfile = () => {
+    if (admin) {
+      setEditProfileData({
+        username: admin.username,
+        password: "",
+        currentPassword: ""
+      })
+      setIsEditProfileOpen(true)
+    }
+  }
+
+  const handleUpdateProfile = async () => {
+    if (!editProfileData.username || !editProfileData.password || !editProfileData.currentPassword) {
+      alert("Please fill in all fields")
+      return
+    }
+
+    setEditProfileLoading(true)
+    try {
+      const result = await updateAdminProfile(editProfileData)
+      
+      if (result.error) {
+        alert(result.error)
+        return
+      }
+
+      // Update local admin state
+      if (result.admin) {
+        setAdmin({
+          ...admin!,
+          username: result.admin.username
+        })
+      }
+
+      // Close dialog and reset form
+      setIsEditProfileOpen(false)
+      setEditProfileData({
+        username: "",
+        password: "",
+        currentPassword: ""
+      })
+
+      alert("Profile updated successfully!")
+    } catch (error) {
+      alert("Failed to update profile")
+    } finally {
+      setEditProfileLoading(false)
     }
   }
 
@@ -311,11 +378,25 @@ export default function AdminDashboard() {
               <p className="text-xs md:text-sm text-gray-500 hidden sm:block">Welcome back, {admin?.username}</p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleSignOut} size={isMobileView ? "sm" : "default"}>
-            <LogOut className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden sm:inline">Sign Out</span>
-            <span className="sm:hidden">Out</span>
-          </Button>
+          
+          {/* Replace logout button with three-dots menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size={isMobileView ? "sm" : "default"}>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleEditProfile}>
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+                <LogOut className="h-4 w-4 mr-2" />
+                Admin Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -483,6 +564,95 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
+        <DialogContent className="mx-4 max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Admin Profile</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-username">Username *</Label>
+              <Input
+                id="edit-username"
+                placeholder="Enter new username"
+                value={editProfileData.username}
+                onChange={(e) => setEditProfileData({ ...editProfileData, username: e.target.value })}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="edit-current-password">Current Password *</Label>
+              <div className="relative">
+                <Input
+                  id="edit-current-password"
+                  type={showCurrentPassword ? "text" : "password"}
+                  placeholder="Enter current password"
+                  value={editProfileData.currentPassword}
+                  onChange={(e) => setEditProfileData({ ...editProfileData, currentPassword: e.target.value })}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  {showCurrentPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="edit-password">New Password *</Label>
+              <div className="relative">
+                <Input
+                  id="edit-password"
+                  type={showEditPassword ? "text" : "password"}
+                  placeholder="Enter new password"
+                  value={editProfileData.password}
+                  onChange={(e) => setEditProfileData({ ...editProfileData, password: e.target.value })}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                >
+                  {showEditPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditProfileOpen(false)} 
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleUpdateProfile} 
+                disabled={editProfileLoading} 
+                className="w-full sm:w-auto"
+              >
+                {editProfileLoading ? "Updating..." : "Update Profile"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

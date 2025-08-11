@@ -51,4 +51,54 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// Update admin profile (username and password)
+router.put("/profile", async (req, res) => {
+  const { username, password, currentPassword } = req.body;
+  
+  if (!username || !password || !currentPassword) {
+    return res.status(400).json({ error: "Username, new password, and current password are required" });
+  }
+  
+  try {
+    // Get admin ID from cookie
+    const adminId = req.cookies.admin_session;
+    if (!adminId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    // Find admin and verify current password
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+    
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ error: "Current password is incorrect" });
+    }
+    
+    // Check if new username is already taken by another admin
+    if (username !== admin.username) {
+      const existingAdmin = await Admin.findOne({ username });
+      if (existingAdmin) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+    }
+    
+    // Hash new password and update admin
+    const hashedPassword = await bcrypt.hash(password, 10);
+    admin.username = username;
+    admin.password = hashedPassword;
+    await admin.save();
+    
+    res.json({ 
+      success: true, 
+      admin: { id: admin._id, username: admin.username } 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 module.exports = router; 

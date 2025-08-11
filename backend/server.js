@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 const http = require("http");
 const socketIo = require("socket.io");
 const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ const io = socketIo(server, {
 
 
 app.use(express.json());
+app.use(cookieParser());
 
 const authMiddleware = require('./middleware/authMiddleware');
 

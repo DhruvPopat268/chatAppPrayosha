@@ -306,3 +306,35 @@ export async function updateUser(userId: string, data: Partial<User>): Promise<{
     return { error: 'User update failed. Please try again.' };
   }
 }
+
+// Update admin profile (username and password)
+export async function updateAdminProfile(data: {
+  username: string;
+  password: string;
+  currentPassword: string;
+}): Promise<{ success?: boolean; error?: string; admin?: { id: string; username: string } }> {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin-auth/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+      credentials: 'include' // Include cookies for authentication
+    });
+    
+    const result = await response.json();
+    if (!response.ok) {
+      return { error: result.error || 'Profile update failed' };
+    }
+    
+    // Update localStorage with new username if successful
+    if (typeof window !== 'undefined' && result.admin) {
+      localStorage.setItem('adminUsername', result.admin.username);
+    }
+    
+    return { success: true, admin: result.admin };
+  } catch (error) {
+    return { error: 'Profile update failed. Please try again.' };
+  }
+}
