@@ -3806,6 +3806,27 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               >
                 <PhoneOff className="h-8 w-8" />
               </Button>
+
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={async () => {
+                  if (webrtcManager) {
+                    if (typeof webrtcManager.toggleCamera === 'function') {
+                      await webrtcManager.toggleCamera();
+                    } else {
+                      console.error('toggleCamera method not implemented on WebRTCManager');
+                    }
+                  } else {
+                    console.error('WebRTC manager not available for camera toggle');
+                  }
+                }}
+                className="video-call-control-button bg-white text-gray-800 hover:bg-gray-200"
+                style={{ marginRight: 8 }}
+              >
+                <Camera className="h-8 w-8" />
+                <span className="ml-2">Switch Camera</span>
+              </Button>
             </div>
           </div>
         </div>

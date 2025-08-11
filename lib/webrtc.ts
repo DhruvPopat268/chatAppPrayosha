@@ -37,6 +37,7 @@ class WebRTCManager {
     remoteStream: null,
     callData: null
   }
+  private currentCamera: 'user' | 'environment' = 'user';
 
   constructor(socket: any) {
     // Ensure we're in a browser environment
@@ -805,6 +806,46 @@ class WebRTCManager {
 
   private generateRoomId(): string {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  }
+
+  async toggleCamera() {
+    if (!this.currentCallState.isConnected || !this.currentCallState.isVideoEnabled) {
+      console.warn('No active video call to switch camera');
+      return;
+    }
+    try {
+      // Toggle camera
+      this.currentCamera = this.currentCamera === 'user' ? 'environment' : 'user';
+      // Stop current video tracks
+      if (this.localStream) {
+        this.localStream.getVideoTracks().forEach(track => track.stop());
+      }
+      // Get new stream with opposite facingMode
+      const constraints: MediaStreamConstraints = {
+        audio: true,
+        video: { facingMode: { exact: this.currentCamera }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      };
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Replace video track in peer connection
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (this.peerConnection && newVideoTrack) {
+        const senders = this.peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        if (videoSender) {
+          await videoSender.replaceTrack(newVideoTrack);
+        }
+      }
+      // Replace video track in localStream
+      if (this.localStream && newVideoTrack) {
+        this.localStream.removeTrack(this.localStream.getVideoTracks()[0]);
+        this.localStream.addTrack(newVideoTrack);
+      }
+      // Update call state
+      this.currentCallState.localStream = this.localStream;
+      this.notifyStateChange();
+    } catch (err) {
+      console.error('Failed to switch camera:', err);
+    }
   }
 }
 
