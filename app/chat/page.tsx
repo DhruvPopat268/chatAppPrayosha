@@ -231,11 +231,16 @@ interface Message {
   receiverId?: string
   content: string
   timestamp: string
-  type: "text" | "image" | "file" | "voice"
+  type: "text" | "image" | "file" | "voice" | "link"
   fileName?: string
   fileSize?: string
   // 🔥 NEW: Add read status for read receipts
   isRead?: boolean
+  // 🔥 NEW: Add link metadata for hyperlink messages
+  linkUrl?: string
+  linkTitle?: string
+  linkDescription?: string
+  linkImage?: string
 }
 
 interface ApiUser {
@@ -253,6 +258,36 @@ interface CurrentUser {
   email: string
   bio: string
 }
+
+// 🔥 NEW: Utility functions for hyperlink detection and processing
+const isUrl = (text: string): boolean => {
+  const urlRegex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+  return urlRegex.test(text);
+};
+
+const extractUrls = (text: string): string[] => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.match(urlRegex) || [];
+};
+
+const getLinkPreview = async (url: string) => {
+  try {
+    // For now, we'll create a simple preview
+    // In a production app, you might want to use a link preview service
+    const domain = new URL(url).hostname;
+    return {
+      title: domain,
+      description: `Link to ${domain}`,
+      image: null
+    };
+  } catch (error) {
+    return {
+      title: 'Invalid URL',
+      description: 'Could not load link preview',
+      image: null
+    };
+  }
+};
 
 const contacts: Contact[] = [
   {
@@ -1034,18 +1069,67 @@ export default function ChatPage() {
           content: message.content
         })
 
-        const newMessage: Message = {
-          id: message._id,
-          senderId: isCurrentUser ? "me" : senderId,
-          receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
-          content: message.content,
-          timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-          type: message.type || "text",
-          fileName: message.fileName,
-          fileSize: message.fileSize,
-          isRead: false
+        // Check if message contains URLs for link detection
+        const urls = extractUrls(message.content);
+        let messageType: "text" | "link" = message.type || "text";
+        let linkMetadata: any = {};
+
+        if (urls.length > 0 && messageType === "text") {
+          messageType = "link";
+          // Handle link detection asynchronously
+          getLinkPreview(urls[0]).then(preview => {
+            linkMetadata = {
+              linkUrl: urls[0],
+              linkTitle: preview.title,
+              linkDescription: preview.description,
+              linkImage: preview.image
+            };
+
+            const newMessage: Message = {
+              id: message._id,
+              senderId: isCurrentUser ? "me" : senderId,
+              receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
+              content: message.content,
+              timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+              type: messageType,
+              fileName: message.fileName,
+              fileSize: message.fileSize,
+              isRead: false,
+              // 🔥 NEW: Add link metadata if it's a link message
+              ...linkMetadata
+            }
+            setMessages(prev => [...prev, newMessage])
+          }).catch(error => {
+            // Fallback to text if link processing fails
+            console.error('Link preview failed:', error);
+            const newMessage: Message = {
+              id: message._id,
+              senderId: isCurrentUser ? "me" : senderId,
+              receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
+              content: message.content,
+              timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+              type: "text",
+              fileName: message.fileName,
+              fileSize: message.fileSize,
+              isRead: false
+            }
+            setMessages(prev => [...prev, newMessage])
+          });
+        } else {
+          // No URLs found, create regular text message
+          const newMessage: Message = {
+            id: message._id,
+            senderId: isCurrentUser ? "me" : senderId,
+            receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
+            content: message.content,
+            timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+            type: messageType,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
+            isRead: false
+          }
+          setMessages(prev => [...prev, newMessage])
         }
-        setMessages(prev => [...prev, newMessage])
 
         // 🔥 If the chat is open and the message is from the selected contact, mark as read
         if (
@@ -1467,7 +1551,7 @@ export default function ChatPage() {
     }
   }, []);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!newMessage.trim() || !selectedContact || !currentUser) return;
 
     // Set flag to prevent blur
@@ -1478,8 +1562,30 @@ export default function ChatPage() {
       messageInputRef.current.focus();
     }
 
+    // Check if message contains URLs
+    const urls = extractUrls(newMessage);
+    let messageType: "text" | "link" = "text";
+    let linkMetadata: any = {};
+
+    if (urls.length > 0) {
+      messageType = "link";
+      try {
+        const url = urls[0]; // Use the first URL found
+        const preview = await getLinkPreview(url);
+        linkMetadata = {
+          linkUrl: url,
+          linkTitle: preview.title,
+          linkDescription: preview.description,
+          linkImage: preview.image
+        };
+      } catch (error) {
+        // Fallback to text if link processing fails
+        messageType = "text";
+      }
+    }
+
     // Send message via Socket.IO
-    socketManager.sendMessage(selectedContact.id, newMessage, "text");
+    socketManager.sendMessage(selectedContact.id, newMessage, messageType);
 
     // Add message to local state immediately for optimistic UI
     const message: Message = {
@@ -1488,9 +1594,11 @@ export default function ChatPage() {
       receiverId: selectedContact.id,
       content: newMessage,
       timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-      type: "text",
+      type: messageType,
       // 🔥 NEW: Set initial read status for new messages
-      isRead: false
+      isRead: false,
+      // 🔥 NEW: Add link metadata if it's a link message
+      ...linkMetadata
     };
 
     setMessages(prev => [...prev, message]);
@@ -1635,7 +1743,7 @@ export default function ChatPage() {
           return;
         }
 
-        const formattedMessages: Message[] = messagesData.map((msg: any) => {
+        const formattedMessages: Message[] = await Promise.all(messagesData.map(async (msg: any) => {
           // Check if senderId is populated (object) or just an ID (string)
           const senderId = typeof msg.senderId === 'object' ? msg.senderId._id : msg.senderId
           const isCurrentUser = senderId === currentUser.id
@@ -1647,19 +1755,43 @@ export default function ChatPage() {
             content: msg.content
           })
 
+          // Check if message contains URLs for link detection
+          const urls = extractUrls(msg.content);
+          let messageType: "text" | "link" = msg.type || "text";
+          let linkMetadata: any = {};
+
+          if (urls.length > 0 && messageType === "text") {
+            messageType = "link";
+            try {
+              const url = urls[0]; // Use the first URL found
+              const preview = await getLinkPreview(url);
+              linkMetadata = {
+                linkUrl: url,
+                linkTitle: preview.title,
+                linkDescription: preview.description,
+                linkImage: preview.image
+              };
+            } catch (error) {
+              // Fallback to text if link processing fails
+              messageType = "text";
+            }
+          }
+
           return {
             id: msg._id,
             senderId: isCurrentUser ? "me" : senderId,
             receiverId: isCurrentUser ? contactId : currentUser.id,
             content: msg.content,
             timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-            type: msg.type || "text",
+            type: messageType,
             fileName: msg.fileName,
             fileSize: msg.fileSize,
             // 🔥 NEW: Include read status from backend
-            isRead: msg.isRead || false
+            isRead: msg.isRead || false,
+            // 🔥 NEW: Add link metadata if it's a link message
+            ...linkMetadata
           }
-        })
+        }))
 
         console.log('✅ Formatted messages:', formattedMessages)
         setMessages(formattedMessages)
@@ -3238,6 +3370,92 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                       {message.type === "text" && (
                         <div className="relative pb-4">
                           <p className="text-sm pr-14">{message.content}</p>
+                          <div className="absolute bottom-0 right-0 flex items-center space-x-1">
+                            <span className={cn(
+                              "text-xs",
+                              message.senderId === "me" ? "text-white/70" : "text-gray-500"
+                            )}>
+                              {message.timestamp}
+                            </span>
+                            {message.senderId === "me" && (
+                              <div className="flex items-center">
+                                {messageReadStatus.get(message.id) ? (
+                                  <div className="flex space-x-0.5">
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                ) : (
+                                  <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {message.type === "link" && (
+                        <div className="relative pb-4">
+                          <div className="space-y-2">
+                            <p className="text-sm pr-14">{message.content}</p>
+                            {message.linkUrl && (
+                              <div className={cn(
+                                "rounded-lg p-3 border",
+                                message.senderId === "me" 
+                                  ? "bg-white/10 border-white/20" 
+                                  : "bg-gray-50 border-gray-200"
+                              )}>
+                                <a
+                                  href={message.linkUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={cn(
+                                    "block rounded transition-colors",
+                                    message.senderId === "me" 
+                                      ? "hover:bg-white/5" 
+                                      : "hover:bg-gray-100"
+                                  )}
+                                >
+                                  <div className="flex items-start space-x-3">
+                                    {message.linkImage && (
+                                      <img
+                                        src={message.linkImage}
+                                        alt="Link preview"
+                                        className="w-16 h-16 object-cover rounded flex-shrink-0"
+                                      />
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className={cn(
+                                        "text-sm font-medium truncate",
+                                        message.senderId === "me" ? "text-white" : "text-gray-900"
+                                      )}>
+                                        {message.linkTitle || 'Link'}
+                                      </h4>
+                                      <p className={cn(
+                                        "text-xs mt-1 line-clamp-2",
+                                        message.senderId === "me" ? "text-white/70" : "text-gray-600"
+                                      )}>
+                                        {message.linkDescription || message.linkUrl}
+                                      </p>
+                                      <div className="flex items-center mt-2">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                                        <span className={cn(
+                                          "text-xs",
+                                          message.senderId === "me" ? "text-white/60" : "text-gray-500"
+                                        )}>
+                                          {new URL(message.linkUrl).hostname}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </a>
+                              </div>
+                            )}
+                          </div>
                           <div className="absolute bottom-0 right-0 flex items-center space-x-1">
                             <span className={cn(
                               "text-xs",

@@ -55,6 +55,34 @@ export default function TestPage() {
     setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`])
   }
 
+  // Test hyperlink detection functionality
+  const testHyperlinkDetection = () => {
+    addLog("🔗 Testing hyperlink detection...")
+    
+    const testUrls = [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://github.com/nextjs/next.js",
+      "https://www.google.com",
+      "This is a regular text message without links",
+      "Check out this link: https://stackoverflow.com"
+    ]
+    
+    testUrls.forEach((text, index) => {
+      const urls = extractUrls(text)
+      if (urls.length > 0) {
+        addLog(`✅ Test ${index + 1}: Found ${urls.length} URL(s) - ${urls.join(', ')}`)
+      } else {
+        addLog(`❌ Test ${index + 1}: No URLs found in "${text}"`)
+      }
+    })
+  }
+
+  // Utility function for URL extraction (copied from chat page)
+  const extractUrls = (text: string): string[] => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.match(urlRegex) || [];
+  };
+
   const testOneSignal = async () => {
     try {
       addLog("🔔 Testing OneSignal...")
@@ -342,6 +370,10 @@ export default function TestPage() {
 
             <Button onClick={testDevicePermissions} variant="outline">
               Test Device Permissions
+            </Button>
+
+            <Button onClick={testHyperlinkDetection} variant="outline">
+              🔗 Test Hyperlink Detection
             </Button>
 
             <div className="border-t pt-4">

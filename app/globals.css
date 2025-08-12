@@ -93,6 +93,14 @@ body {
   }
 }
 
+/* Link preview styling */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* Typing indicator (Instagram-like three dots) */
 @keyframes typing-bounce {
   0%, 80%, 100% {
