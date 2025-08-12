@@ -3524,19 +3524,20 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
                               {(() => {
-                                // Prefer a Cloudinary attachment URL to force download
-                                const forcedDownloadUrl = (() => {
+                                // Safer approach: use the original URL and append attname for nicer filename
+                                const downloadUrl = (() => {
                                   try {
-                                    const fileName = message.fileName ? encodeURIComponent(message.fileName) : undefined;
-                                    if (message.content.includes('/upload/')) {
-                                      return message.content.replace('/upload/', `/upload/${fileName ? `fl_attachment:${fileName}` : 'fl_attachment'}/`);
+                                    if (message.fileName) {
+                                      const url = new URL(message.content);
+                                      url.searchParams.set('attname', message.fileName);
+                                      return url.toString();
                                     }
                                   } catch {}
                                   return message.content;
                                 })();
                                 return (
                                   <a
-                                    href={forcedDownloadUrl}
+                                    href={downloadUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     download={message.fileName || true}
@@ -3550,18 +3551,19 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             </div>
                             <div className="flex-shrink-0">
                               {(() => {
-                                const forcedDownloadUrl = (() => {
+                                const downloadUrl = (() => {
                                   try {
-                                    const fileName = message.fileName ? encodeURIComponent(message.fileName) : undefined;
-                                    if (message.content.includes('/upload/')) {
-                                      return message.content.replace('/upload/', `/upload/${fileName ? `fl_attachment:${fileName}` : 'fl_attachment'}/`);
+                                    if (message.fileName) {
+                                      const url = new URL(message.content);
+                                      url.searchParams.set('attname', message.fileName);
+                                      return url.toString();
                                     }
                                   } catch {}
                                   return message.content;
                                 })();
                                 return (
                                   <a
-                                    href={forcedDownloadUrl}
+                                    href={downloadUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     download={message.fileName || true}
