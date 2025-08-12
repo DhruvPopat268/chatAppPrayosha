@@ -3523,15 +3523,54 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
                             <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
-                              <a
-                                href={message.content}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm font-medium underline hover:no-underline block truncate"
-                              >
-                                {message.fileName || 'Download file'}
-                              </a>
+                              {(() => {
+                                // Prefer a Cloudinary attachment URL to force download
+                                const forcedDownloadUrl = (() => {
+                                  try {
+                                    const fileName = message.fileName ? encodeURIComponent(message.fileName) : undefined;
+                                    if (message.content.includes('/upload/')) {
+                                      return message.content.replace('/upload/', `/upload/${fileName ? `fl_attachment:${fileName}` : 'fl_attachment'}/`);
+                                    }
+                                  } catch {}
+                                  return message.content;
+                                })();
+                                return (
+                                  <a
+                                    href={forcedDownloadUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={message.fileName || true}
+                                    className="text-sm font-medium underline hover:no-underline block truncate"
+                                  >
+                                    {message.fileName || 'Download file'}
+                                  </a>
+                                );
+                              })()}
                               <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
+                            </div>
+                            <div className="flex-shrink-0">
+                              {(() => {
+                                const forcedDownloadUrl = (() => {
+                                  try {
+                                    const fileName = message.fileName ? encodeURIComponent(message.fileName) : undefined;
+                                    if (message.content.includes('/upload/')) {
+                                      return message.content.replace('/upload/', `/upload/${fileName ? `fl_attachment:${fileName}` : 'fl_attachment'}/`);
+                                    }
+                                  } catch {}
+                                  return message.content;
+                                })();
+                                return (
+                                  <a
+                                    href={forcedDownloadUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={message.fileName || true}
+                                    className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                  >
+                                    Download
+                                  </a>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div className="absolute bottom-0 right-0 flex items-center space-x-1">
@@ -3630,6 +3669,24 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               accept="image/*"
               className="hidden"
               onChange={handleImageChange}
+            />
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleFileButtonClick}
+              disabled={isUploadingImage}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
+              title="Send file"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="*/*"
+              className="hidden"
+              onChange={handleFileChange}
             />
 
             <div className="flex-1 relative">
