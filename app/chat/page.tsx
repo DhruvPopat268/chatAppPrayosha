@@ -1069,66 +1069,84 @@ export default function ChatPage() {
           content: message.content
         })
 
-        // Check if message contains URLs for link detection
+        // Prefer server-provided link metadata if type is 'link'
         const urls = extractUrls(message.content);
         let messageType: "text" | "link" = message.type || "text";
         let linkMetadata: any = {};
 
-        if (urls.length > 0 && messageType === "text") {
-          messageType = "link";
-          // Handle link detection asynchronously
-          getLinkPreview(urls[0]).then(preview => {
-            linkMetadata = {
-              linkUrl: urls[0],
-              linkTitle: preview.title,
-              linkDescription: preview.description,
-              linkImage: preview.image
-            };
+        if (messageType === 'link') {
+          const url = message.linkUrl || (urls && urls.length > 0 ? urls[0] : undefined);
+          // Use server metadata if available; otherwise fall back to simple defaults
+          linkMetadata = {
+            linkUrl: url,
+            linkTitle: message.linkTitle || (url ? new URL(url).hostname : undefined),
+            linkDescription: message.linkDescription || (url ? `Link to ${new URL(url).hostname}` : undefined),
+            linkImage: message.linkImage,
+          };
 
-            const newMessage: Message = {
-              id: message._id,
-              senderId: isCurrentUser ? "me" : senderId,
-              receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
-              content: message.content,
-              timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-              type: messageType,
-              fileName: message.fileName,
-              fileSize: message.fileSize,
-              isRead: false,
-              // 🔥 NEW: Add link metadata if it's a link message
-              ...linkMetadata
-            }
-            setMessages(prev => [...prev, newMessage])
-          }).catch(error => {
-            // Fallback to text if link processing fails
-            console.error('Link preview failed:', error);
-            const newMessage: Message = {
-              id: message._id,
-              senderId: isCurrentUser ? "me" : senderId,
-              receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
-              content: message.content,
-              timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-              type: "text",
-              fileName: message.fileName,
-              fileSize: message.fileSize,
-              isRead: false
-            }
-            setMessages(prev => [...prev, newMessage])
-          });
-        } else {
-          // No URLs found, create regular text message
           const newMessage: Message = {
             id: message._id,
             senderId: isCurrentUser ? "me" : senderId,
             receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
             content: message.content,
             timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
-            type: messageType,
+            type: 'link',
             fileName: message.fileName,
             fileSize: message.fileSize,
-            isRead: false
-          }
-          setMessages(prev => [...prev, newMessage])
+            isRead: false,
+            ...linkMetadata
+          };
+          setMessages(prev => [...prev, newMessage]);
+        } else if (urls.length > 0) {
+          // Detected URL but server marked as text; compute preview
+          getLinkPreview(urls[0]).then(preview => {
+            const meta = {
+              linkUrl: urls[0],
+              linkTitle: preview.title,
+              linkDescription: preview.description,
+              linkImage: preview.image,
+            };
+            const newMessage: Message = {
+              id: message._id,
+              senderId: isCurrentUser ? "me" : senderId,
+              receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
+              content: message.content,
+              timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+              type: 'link',
+              fileName: message.fileName,
+              fileSize: message.fileSize,
+              isRead: false,
+              ...meta,
+            };
+            setMessages(prev => [...prev, newMessage]);
+          }).catch(() => {
+            const newMessage: Message = {
+              id: message._id,
+              senderId: isCurrentUser ? "me" : senderId,
+              receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
+              content: message.content,
+              timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+              type: 'text',
+              fileName: message.fileName,
+              fileSize: message.fileSize,
+              isRead: false,
+            };
+            setMessages(prev => [...prev, newMessage]);
+          });
+        } else {
+          // Plain text
+          const newMessage: Message = {
+            id: message._id,
+            senderId: isCurrentUser ? "me" : senderId,
+            receiverId: isCurrentUser ? selectedContact.id : currentUser.id,
+            content: message.content,
+            timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+            type: 'text',
+            fileName: message.fileName,
+            fileSize: message.fileSize,
+            isRead: false,
+          };
+          setMessages(prev => [...prev, newMessage]);
         }
 
         // 🔥 If the chat is open and the message is from the selected contact, mark as read
@@ -1762,25 +1780,33 @@ export default function ChatPage() {
             content: msg.content
           })
 
-          // Check if message contains URLs for link detection
+          // Prefer backend-provided metadata for link messages
           const urls = extractUrls(msg.content);
           let messageType: "text" | "link" = msg.type || "text";
           let linkMetadata: any = {};
 
-          if (urls.length > 0 && messageType === "text") {
-            messageType = "link";
+          if (messageType === 'link') {
+            const url = msg.linkUrl || (urls && urls.length > 0 ? urls[0] : undefined);
+            linkMetadata = {
+              linkUrl: url,
+              linkTitle: msg.linkTitle || (url ? new URL(url).hostname : undefined),
+              linkDescription: msg.linkDescription || (url ? `Link to ${new URL(url).hostname}` : undefined),
+              linkImage: msg.linkImage,
+            };
+          } else if (urls.length > 0) {
+            // Compute preview client-side if server stored as text
             try {
-              const url = urls[0]; // Use the first URL found
+              const url = urls[0];
               const preview = await getLinkPreview(url);
+              messageType = 'link';
               linkMetadata = {
                 linkUrl: url,
                 linkTitle: preview.title,
                 linkDescription: preview.description,
-                linkImage: preview.image
+                linkImage: preview.image,
               };
-            } catch (error) {
-              // Fallback to text if link processing fails
-              messageType = "text";
+            } catch {
+              messageType = 'text';
             }
           }
 
