@@ -98,7 +98,14 @@ class SocketManager {
   }
 
   // Send a message
-  sendMessage(receiverId: string, content: string, type: string = 'text', fileName?: string, fileSize?: string) {
+  sendMessage(
+    receiverId: string,
+    content: string,
+    type: string = 'text',
+    fileName?: string,
+    fileSize?: string,
+    linkMeta?: { linkUrl?: string; linkTitle?: string; linkDescription?: string; linkImage?: string }
+  ) {
     if (!this.socket || !this.isConnected) {
       console.error('Socket not connected')
       return
@@ -109,7 +116,8 @@ class SocketManager {
       content,
       type,
       fileName,
-      fileSize
+      fileSize,
+      ...(linkMeta || {})
     })
   }
 

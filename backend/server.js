@@ -15,7 +15,7 @@ const messageRoutes = require("./routes/messageRoute");
 const adminAuthRoutes = require("./routes/adminAuthRoute");
 const User = require('./models/authModel');
 const Session = require('./models/sessionModel');
-const { cleanupExpiredSessions } = require('./utils/sessionUtils');
+// Session utilities no longer schedule TTL-based cleanup
 
 const app = express();
 const server = http.createServer(app);
@@ -453,7 +453,7 @@ io.on('connection', (socket) => {
   // Handle sending messages
   socket.on('send_message', async (data) => {
     try {
-      const { receiverId, content, type, fileName, fileSize } = data;
+      const { receiverId, content, type, fileName, fileSize, linkUrl, linkTitle, linkDescription, linkImage } = data;
       
       console.log(`📝 Sending message:`, {
         senderId: socket.userId,
@@ -472,7 +472,12 @@ io.on('connection', (socket) => {
         content,
         type: type || 'text',
         fileName,
-        fileSize
+        fileSize,
+        // link fields
+        linkUrl,
+        linkTitle,
+        linkDescription,
+        linkImage
       });
       
       console.log(`📝 Message created in DB:`, {
@@ -933,23 +938,24 @@ app.post('/api/debug/test-call-notification', async (req, res) => {
 });
 
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log("✅ MongoDB Connected");
     server.listen(process.env.PORT, () => {
       console.log(`🚀 Server running on http://localhost:${process.env.PORT}`);
       console.log(`🔌 Socket.IO server ready`);
     });
     
-    // Set up session cleanup job (run every 6 hours)
-    setInterval(cleanupExpiredSessions, 6 * 60 * 60 * 1000);
-    console.log("🧹 Session cleanup job scheduled");
+    // Removed periodic session cleanup since sessions no longer expire automatically
 
-    // Ensure TTL indexes are in place for messages (auto-delete after 1 hour)
+    // Ensure indexes are in place and drop any legacy TTL indexes
     try {
       const Message = require('./models/messageModel');
-      Message.syncIndexes().then(() => console.log('🗑️ Message TTL index synced (1h)'));
+      const Session = require('./models/sessionModel');
+      await Message.syncIndexes();
+      await Session.syncIndexes();
+      console.log('✅ Message and Session indexes synced (TTL removed)');
     } catch (e) {
-      console.warn('Warning: could not sync Message indexes:', e?.message || e);
+      console.warn('Warning: could not sync indexes:', e?.message || e);
     }
   })
   .catch(err => {

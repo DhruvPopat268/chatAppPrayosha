@@ -1585,7 +1585,14 @@ export default function ChatPage() {
     }
 
     // Send message via Socket.IO
-    socketManager.sendMessage(selectedContact.id, newMessage, messageType);
+    socketManager.sendMessage(
+      selectedContact.id,
+      newMessage,
+      messageType,
+      undefined,
+      undefined,
+      messageType === 'link' ? linkMetadata : undefined
+    );
 
     // Add message to local state immediately for optimistic UI
     const message: Message = {

@@ -37,7 +37,7 @@ router.get('/:receiverId', async (req, res) => {
 // Send a message
 router.post('/', async (req, res) => {
   try {
-    const { receiverId, content, type = 'text', fileName, fileSize } = req.body;
+    const { receiverId, content, type = 'text', fileName, fileSize, linkUrl, linkTitle, linkDescription, linkImage } = req.body;
 
     if (!receiverId || !content) {
       return res.status(400).json({ error: "Receiver ID and content are required" });
@@ -49,7 +49,11 @@ router.post('/', async (req, res) => {
       content,
       type,
       fileName,
-      fileSize
+      fileSize,
+      linkUrl,
+      linkTitle,
+      linkDescription,
+      linkImage
     });
 
     const populatedMessage = await Message.findById(message._id)
