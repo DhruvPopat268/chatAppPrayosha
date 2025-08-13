@@ -1782,7 +1782,8 @@ export default function ChatPage() {
 
           // Prefer backend-provided metadata for link messages
           const urls = extractUrls(msg.content);
-          let messageType: "text" | "link" = msg.type || "text";
+          // Preserve the original backend type (text, image, file, voice, link)
+          let messageType: "text" | "image" | "file" | "voice" | "link" = (msg.type || "text");
           let linkMetadata: any = {};
 
           if (messageType === 'link') {
@@ -1793,7 +1794,7 @@ export default function ChatPage() {
               linkDescription: msg.linkDescription || (url ? `Link to ${new URL(url).hostname}` : undefined),
               linkImage: msg.linkImage,
             };
-          } else if (urls.length > 0) {
+          } else if (messageType === 'text' && urls.length > 0) {
             // Compute preview client-side if server stored as text
             try {
               const url = urls[0];
