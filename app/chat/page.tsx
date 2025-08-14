@@ -3270,132 +3270,6 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 </div>
               ) : (
                 messages.map((message) => (
-                  // <div
-                  //   key={message.id}
-                  //   className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
-                  // >
-                  //   <div
-                  //     className={cn(
-                  //       "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative",
-                  //       message.senderId === "me"
-                  //         ? "bg-blue-500 text-white rounded-br-md"
-                  //         : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
-                  //     )}
-                  //   >
-                  //     {message.type === "text" && (
-                  //       <div className="relative">
-                  //         <p className="chat-message-text text-sm pr-12">{message.content}</p>
-                  //         <div className="flex items-center justify-end space-x-1 mt-1">
-                  //           <span className="chat-message-timestamp text-xs">
-                  //             {message.timestamp}
-                  //           </span>
-                  //           {/* 🔥 NEW: Read receipts with ticks */}
-                  //           {message.senderId === "me" && (
-                  //             <div className="flex items-center ml-1">
-                  //               {messageReadStatus.get(message.id) ? (
-                  //                 // ⚫ Two black ticks = read
-                  //                 <div className="flex space-x-0.5">
-                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                   </svg>
-                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                   </svg>
-                  //                 </div>
-                  //               ) : (
-                  //                 // ⚫ One black tick = sent but not read
-                  //                 <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                 </svg>
-                  //               )}
-                  //             </div>
-                  //           )}
-                  //         </div>
-                  //       </div>
-                  //     )}
-                  //     {message.type === "image" && message.content && (
-                  //       <div className="space-y-2">
-                  //         <img
-                  //           src={message.content}
-                  //           alt="Shared image"
-                  //           className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                  //           style={{ maxWidth: 240, maxHeight: 320 }}
-                  //           onClick={() => setPreviewImage(message.content)}
-                  //         />
-                  //         <div className="flex items-center justify-end space-x-1">
-                  //           <span className="chat-message-timestamp text-xs">
-                  //             {message.timestamp}
-                  //           </span>
-                  //           {/* 🔥 NEW: Read receipts with ticks for images */}
-                  //           {message.senderId === "me" && (
-                  //             <div className="flex items-center ml-1">
-                  //               {messageReadStatus.get(message.id) ? (
-                  //                 // ⚫ Two black ticks = read
-                  //                 <div className="flex space-x-0.5">
-                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                   </svg>
-                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                   </svg>
-                  //                 </div>
-                  //               ) : (
-                  //                 // ⚫ One black tick = sent but not read
-                  //                 <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                 </svg>
-                  //               )}
-                  //             </div>
-                  //           )}
-                  //         </div>
-                  //       </div>
-                  //     )}
-                  //     {message.type === "file" && message.content && (
-                  //       <div className="space-y-2">
-                  //         <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
-                  //           <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
-                  //           <div className="min-w-0 flex-1">
-                  //             <a
-                  //               href={message.content}
-                  //               target="_blank"
-                  //               rel="noopener noreferrer"
-                  //               className="text-sm font-medium underline hover:no-underline block truncate"
-                  //             >
-                  //               {message.fileName || 'Download file'}
-                  //             </a>
-                  //             <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
-                  //           </div>
-                  //         </div>
-                  //         <div className="flex items-center justify-end space-x-1">
-                  //           <span className="chat-message-timestamp text-xs">
-                  //             {message.timestamp}
-                  //           </span>
-                  //           {/* 🔥 NEW: Read receipts with ticks for files */}
-                  //           {message.senderId === "me" && (
-                  //             <div className="flex items-center ml-1">
-                  //               {messageReadStatus.get(message.id) ? (
-                  //                 // ⚫ Two black ticks = read
-                  //                 <div className="flex space-x-0.5">
-                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                   </svg>
-                  //                   <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                   </svg>
-                  //                 </div>
-                  //               ) : (
-                  //                 // ⚫ One black tick = sent but not read
-                  //                 <svg className="w-3 h-3 text-black" fill="currentColor" viewBox="0 0 20 20">
-                  //                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  //                 </svg>
-                  //               )}
-                  //             </div>
-                  //           )}
-                  //         </div>
-                  //       </div>
-                  //     )}
-                  //   </div>
-                  // </div>
                   <div
                     key={message.id}
                     className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
@@ -3410,16 +3284,21 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     >
                       {message.type === "text" && (
                         <div className="relative pb-4">
-                          <p className="text-sm pr-14">{message.content}</p>
+                          <p className={cn(
+                            "text-sm",
+                            message.senderId === "me" ? "pr-20" : "pr-16" // Increased padding for sender messages
+                          )}>
+                            {message.content}
+                          </p>
                           <div className="absolute bottom-0 right-0 flex items-center space-x-1">
                             <span className={cn(
-                              "text-xs",
+                              "text-xs whitespace-nowrap",
                               message.senderId === "me" ? "text-white/70" : "text-gray-500"
                             )}>
                               {message.timestamp}
                             </span>
                             {message.senderId === "me" && (
-                              <div className="flex items-center">
+                              <div className="flex items-center flex-shrink-0">
                                 {messageReadStatus.get(message.id) ? (
                                   <div className="flex space-x-0.5">
                                     <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
@@ -3442,12 +3321,17 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                       {message.type === "link" && (
                         <div className="relative pb-4">
                           <div className="space-y-2">
-                            <p className="text-sm pr-14">{message.content}</p>
+                            <p className={cn(
+                              "text-sm",
+                              message.senderId === "me" ? "pr-20" : "pr-16" // Increased padding for sender messages
+                            )}>
+                              {message.content}
+                            </p>
                             {message.linkUrl && (
                               <div className={cn(
                                 "rounded-lg p-3 border",
-                                message.senderId === "me" 
-                                  ? "bg-white/10 border-white/20" 
+                                message.senderId === "me"
+                                  ? "bg-white/10 border-white/20"
                                   : "bg-gray-50 border-gray-200"
                               )}>
                                 <a
@@ -3456,8 +3340,8 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                                   rel="noopener noreferrer"
                                   className={cn(
                                     "block rounded transition-colors",
-                                    message.senderId === "me" 
-                                      ? "hover:bg-white/5" 
+                                    message.senderId === "me"
+                                      ? "hover:bg-white/5"
                                       : "hover:bg-gray-100"
                                   )}
                                 >
@@ -3499,13 +3383,13 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           </div>
                           <div className="absolute bottom-0 right-0 flex items-center space-x-1">
                             <span className={cn(
-                              "text-xs",
+                              "text-xs whitespace-nowrap",
                               message.senderId === "me" ? "text-white/70" : "text-gray-500"
                             )}>
                               {message.timestamp}
                             </span>
                             {message.senderId === "me" && (
-                              <div className="flex items-center">
+                              <div className="flex items-center flex-shrink-0">
                                 {messageReadStatus.get(message.id) ? (
                                   <div className="flex space-x-0.5">
                                     <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
@@ -3535,11 +3419,11 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                             onClick={() => setPreviewImage(message.content)}
                           />
                           <div className="absolute bottom-0 right-0 flex items-center space-x-1 bg-black/20 rounded px-1 py-0.5">
-                            <span className="text-xs text-white">
+                            <span className="text-xs text-white whitespace-nowrap">
                               {message.timestamp}
                             </span>
                             {message.senderId === "me" && (
-                              <div className="flex items-center">
+                              <div className="flex items-center flex-shrink-0">
                                 {messageReadStatus.get(message.id) ? (
                                   <div className="flex space-x-0.5">
                                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -3573,7 +3457,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                                       url.searchParams.set('attname', message.fileName);
                                       return url.toString();
                                     }
-                                  } catch {}
+                                  } catch { }
                                   return message.content;
                                 })();
                                 return (
@@ -3599,7 +3483,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                                       url.searchParams.set('attname', message.fileName);
                                       return url.toString();
                                     }
-                                  } catch {}
+                                  } catch { }
                                   return message.content;
                                 })();
                                 return (
@@ -3618,13 +3502,13 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                           </div>
                           <div className="absolute bottom-0 right-0 flex items-center space-x-1">
                             <span className={cn(
-                              "text-xs",
+                              "text-xs whitespace-nowrap",
                               message.senderId === "me" ? "text-white/70" : "text-gray-500"
                             )}>
                               {message.timestamp}
                             </span>
                             {message.senderId === "me" && (
-                              <div className="flex items-center">
+                              <div className="flex items-center flex-shrink-0">
                                 {messageReadStatus.get(message.id) ? (
                                   <div className="flex space-x-0.5">
                                     <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
@@ -4152,7 +4036,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                 <PhoneOff className="h-8 w-8" />
               </Button>
 
-            
+
             </div>
           </div>
         </div>
