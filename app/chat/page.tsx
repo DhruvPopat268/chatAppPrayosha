@@ -409,6 +409,13 @@ export default function ChatPage() {
     }
   }, [router]);
 
+  // Sidebar open useEffect when selectedContact is null
+  useEffect(() => {
+    if (!selectedContact) {
+      setIsSidebarOpen(true);
+    }
+  }, [selectedContact]);
+
   // Helper to get Subscription ID from IndexedDB with better error handling
   function getSubscriptionIdFromIndexedDB() {
     return new Promise<string>((resolve, reject) => {
