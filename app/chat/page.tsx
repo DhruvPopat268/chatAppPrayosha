@@ -2785,9 +2785,6 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
     }, {} as Record<string, any[]>);
   };
 
-
-
-
   // 🔥 NEW: Reconnection popup component
   const ReconnectionPopup = () => {
     if (!showReconnectPopup) return null;
@@ -3344,7 +3341,7 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                               <p
                                 className={cn(
                                   "text-sm break-words whitespace-pre-wrap",
-                                  message.senderId === "me" ? "pr-5" : "pr-16"
+                                  message.senderId === "me" ? "pr-20" : "pr-16" // Increased padding for sender messages to accommodate read receipts
                                 )}
                               >
                                 {message.content}
@@ -3360,6 +3357,122 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                                 >
                                   {message.timestamp}
                                 </span>
+                                {/* Read Receipt Ticks - Only show for sent messages */}
+                                {message.senderId === "me" && (
+                                  <div className="flex items-center flex-shrink-0">
+                                    {messageReadStatus.get(message.id) ? (
+                                      // Double tick (read)
+                                      <div className="flex space-x-0.5">
+                                        <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    ) : (
+                                      // Single tick (sent)
+                                      <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {message.type === "link" && (
+                            <div className="relative pb-4">
+                              <div className="space-y-2">
+                                <p className={cn(
+                                  "text-sm break-words whitespace-pre-wrap",
+                                  message.senderId === "me" ? "pr-20" : "pr-16" // Increased padding for sender messages
+                                )}>
+                                  {message.content}
+                                </p>
+                                {message.linkUrl && (
+                                  <div className={cn(
+                                    "rounded-lg p-3 border",
+                                    message.senderId === "me"
+                                      ? "bg-white/10 border-white/20"
+                                      : "bg-gray-50 border-gray-200"
+                                  )}>
+                                    <a
+                                      href={message.linkUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={cn(
+                                        "block rounded transition-colors",
+                                        message.senderId === "me"
+                                          ? "hover:bg-white/5"
+                                          : "hover:bg-gray-100"
+                                      )}
+                                    >
+                                      <div className="flex items-start space-x-3">
+                                        {message.linkImage && (
+                                          <img
+                                            src={message.linkImage}
+                                            alt="Link preview"
+                                            className="w-16 h-16 object-cover rounded flex-shrink-0"
+                                          />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                          <h4 className={cn(
+                                            "text-sm font-medium truncate",
+                                            message.senderId === "me" ? "text-white" : "text-gray-900"
+                                          )}>
+                                            {message.linkTitle || 'Link'}
+                                          </h4>
+                                          <p className={cn(
+                                            "text-xs mt-1 line-clamp-2",
+                                            message.senderId === "me" ? "text-white/70" : "text-gray-600"
+                                          )}>
+                                            {message.linkDescription || message.linkUrl}
+                                          </p>
+                                          <div className="flex items-center mt-2">
+                                            <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                                            <span className={cn(
+                                              "text-xs",
+                                              message.senderId === "me" ? "text-white/60" : "text-gray-500"
+                                            )}>
+                                              {new URL(message.linkUrl).hostname}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="absolute bottom-0 right-0 flex items-center space-x-1">
+                                <span className={cn(
+                                  "text-xs whitespace-nowrap",
+                                  message.senderId === "me" ? "text-white/70" : "text-gray-500"
+                                )}>
+                                  {message.timestamp}
+                                </span>
+                                {/* Read Receipt Ticks for Link Messages - Only show for sent messages */}
+                                {message.senderId === "me" && (
+                                  <div className="flex items-center flex-shrink-0">
+                                    {messageReadStatus.get(message.id) ? (
+                                      // Double tick (read)
+                                      <div className="flex space-x-0.5">
+                                        <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                        <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    ) : (
+                                      // Single tick (sent)
+                                      <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -3371,7 +3484,6 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
               )}
               <div ref={messagesEndRef} className="h-4" />
             </div>
-
           </ScrollArea>
 
           {/* Scroll to Bottom Button */}
