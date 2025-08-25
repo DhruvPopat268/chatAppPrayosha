@@ -421,69 +421,59 @@ export default function ChatPage() {
     return new Promise<string>((resolve, reject) => {
       console.log('🗄️ Attempting to access OneSignal IndexedDB...');
 
+      // Check for mobile-specific IndexedDB issues
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
       if (typeof window === 'undefined' || !window.indexedDB) {
         reject('❌ IndexedDB not available');
         return;
       }
 
+      // Mobile browsers might need more time
+      const timeoutMs = isMobile ? 10000 : 5000;
+      const timeoutId = setTimeout(() => {
+        reject('❌ IndexedDB access timeout');
+      }, timeoutMs);
+
       const request = indexedDB.open('ONE_SIGNAL_SDK_DB');
 
       request.onerror = () => {
+        clearTimeout(timeoutId);
         console.error('❌ Failed to open OneSignal IndexedDB:', request.error);
         reject('❌ Failed to open IndexedDB: ' + request.error?.message);
       };
 
       request.onsuccess = () => {
+        clearTimeout(timeoutId);
         const db = request.result;
         console.log('✅ OneSignal IndexedDB opened successfully');
-        console.log('📊 Database object stores:', db.objectStoreNames);
 
-        // Check if the subscriptions object store exists
-        if (!db.objectStoreNames.contains('subscriptions')) {
-          console.error('❌ Subscriptions object store not found in IndexedDB');
-          console.log('📋 Available object stores:', Array.from(db.objectStoreNames));
+        // Add mobile-specific error handling
+        try {
+          // Your existing logic here, but with additional error handling
+          if (!db.objectStoreNames.contains('subscriptions')) {
+            console.error('❌ Subscriptions object store not found');
 
-          // Try to find any object store that might contain subscription data
-          const availableStores = Array.from(db.objectStoreNames);
-          console.log('🔍 Searching through available stores for subscription data...');
+            // On mobile, try alternative approaches
+            if (isMobile) {
+              console.log('📱 Mobile detected, trying alternative stores...');
+              // Try other OneSignal stores that might exist on mobile
+              const alternativeStores = ['Onesignal', 'onesignal', 'notifications', 'subscription'];
 
-          // Try to find subscription data in other stores
-          for (const storeName of availableStores) {
-            try {
-              const transaction = db.transaction([storeName], 'readonly');
-              const store = transaction.objectStore(storeName);
-              const getAllRequest = store.getAll();
-
-              getAllRequest.onsuccess = () => {
-                const data = getAllRequest.result;
-                console.log(`📦 Data in ${storeName}:`, data);
-
-                // Look for any object that might contain a subscription ID
-                if (data && data.length > 0) {
-                  for (const item of data) {
-                    if (item.id || item.subscriptionId || item.playerId || item.onesignalId) {
-                      const foundId = item.id || item.subscriptionId || item.playerId || item.onesignalId;
-                      console.log(`✅ Found potential subscription ID in ${storeName}:`, foundId);
-                      resolve(foundId);
-                      return;
-                    }
-                  }
+              for (const storeName of alternativeStores) {
+                if (db.objectStoreNames.contains(storeName)) {
+                  console.log(`🔍 Found alternative store: ${storeName}`);
+                  // Try to read from this store
+                  // ... (implement similar logic as your existing code)
                 }
-              };
-
-              getAllRequest.onerror = () => {
-                console.log(`⚠️ Could not read from ${storeName}:`, getAllRequest.error);
-              };
-            } catch (error) {
-              console.log(`⚠️ Error accessing ${storeName}:`, error);
+              }
             }
+
+            reject('❌ No suitable object store found');
+            return;
           }
 
-          reject('❌ Subscriptions object store not found. Available stores: ' + Array.from(db.objectStoreNames).join(', '));
-          return;
-        }
-
-        try {
+          // Your existing transaction logic here
           const transaction = db.transaction(['subscriptions'], 'readonly');
           const store = transaction.objectStore('subscriptions');
           const getAllRequest = store.getAll();
@@ -493,7 +483,6 @@ export default function ChatPage() {
             console.log('📦 Retrieved subscriptions from IndexedDB:', subs);
 
             if (subs && subs.length > 0) {
-              // Look for subscription ID in various possible formats
               for (const sub of subs) {
                 const subscriptionId = sub.id || sub.subscriptionId || sub.playerId || sub.onesignalId;
                 if (subscriptionId) {
@@ -502,144 +491,110 @@ export default function ChatPage() {
                   return;
                 }
               }
-
-              console.log('⚠️ No valid subscription ID found in subscriptions store');
-              console.log('📋 Available fields in first subscription:', subs[0] ? Object.keys(subs[0]) : 'No data');
-            } else {
-              console.log('⚠️ No subscriptions found in IndexedDB');
             }
 
             reject('❌ No subscription ID found in IndexedDB');
           };
 
           getAllRequest.onerror = () => {
-            console.error('❌ Failed to read subscriptions from IndexedDB:', getAllRequest.error);
+            console.error('❌ Failed to read subscriptions:', getAllRequest.error);
             reject('❌ Failed to read subscriptions: ' + getAllRequest.error?.message);
           };
+
         } catch (error) {
-          console.error('❌ Error accessing subscriptions object store:', error);
-          reject('❌ Error accessing subscriptions: ' + (error instanceof Error ? error.message : String(error)));
+          clearTimeout(timeoutId);
+          console.error('❌ Error in IndexedDB transaction:', error);
+          reject('❌ Transaction error: ' + (error instanceof Error ? error.message : String(error)));
         }
       };
 
+      // Handle upgrade needed (might be more common on mobile)
       request.onupgradeneeded = (event) => {
         console.log('🔄 IndexedDB upgrade needed');
         const db = (event.target as IDBOpenDBRequest).result;
 
-        // Check if subscriptions store exists, if not create it
         if (!db.objectStoreNames.contains('subscriptions')) {
           console.log('📝 Creating subscriptions object store...');
-          db.createObjectStore('subscriptions', { keyPath: 'id' });
+          try {
+            db.createObjectStore('subscriptions', { keyPath: 'id' });
+          } catch (upgradeError) {
+            console.error('❌ Failed to create object store:', upgradeError);
+          }
         }
       };
     });
   }
 
-  const getAndSaveSubscriptionId = async () => {
+  const getAndSaveSubscriptionId = async (userTriggered = false) => {
     console.log('🚀 Starting getAndSaveSubscriptionId...');
-    console.log('👤 Current user:', currentUser);
+
+    // Ensure this is called from a user gesture on mobile
+    if (!userTriggered && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      console.log('📱 Mobile detected - requires user gesture');
+      return;
+    }
 
     try {
-      // Initialize OneSignal first
       const oneSignalInstance = await initializeOneSignal();
 
       if (oneSignalInstance) {
-        console.log('🔍 Trying OneSignal direct method...');
-        try {
-          // Check if push is supported
-          const isSubscribed = await oneSignalInstance.Notifications.isPushSupported();
-          console.log('📱 Push supported:', isSubscribed);
+        // Add longer delays for mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const delay = isMobile ? 5000 : 3000; // Longer delay for mobile
 
-          if (isSubscribed) {
-            // Check current permission status
-            const permission = await oneSignalInstance.Notifications.permission;
-            console.log('🔔 Current permission:', permission);
+        const isSubscribed = await oneSignalInstance.Notifications.isPushSupported();
+        console.log('📱 Push supported:', isSubscribed);
 
-            // Request permission if not already granted
-            if (permission === 'default' || permission === false) {
-              console.log('🔔 Requesting notification permission...');
-              const newPermission = await oneSignalInstance.Notifications.requestPermission();
-              console.log('🔔 New permission status:', newPermission);
+        if (isSubscribed) {
+          const permission = await oneSignalInstance.Notifications.permission;
+          console.log('🔔 Current permission:', permission);
 
-              // Wait for permission to be processed and OneSignal to update
-              await new Promise(resolve => setTimeout(resolve, 3000));
-            }
+          if (permission === 'default' || permission === false) {
+            console.log('🔔 Requesting notification permission...');
+            const newPermission = await oneSignalInstance.Notifications.requestPermission();
+            console.log('🔔 New permission status:', newPermission);
 
-            // Wait for OneSignal to be fully ready
-            await oneSignalInstance.User.pushSubscription.optedIn;
+            // Longer wait for mobile browsers to process permission
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
 
-            // Try to get Player ID using the correct OneSignal SDK methods
-            let playerId = null;
+          // Multiple attempts for mobile
+          let playerId = null;
+          let attempts = 0;
+          const maxAttempts = isMobile ? 5 : 3;
 
-            // Method 1: Get from User's OneSignal ID
+          while (!playerId && attempts < maxAttempts) {
+            attempts++;
+            console.log(`🔄 Attempt ${attempts} to get Player ID...`);
+
             try {
               playerId = await oneSignalInstance.User.getOneSignalId();
-              console.log('🎯 Method 1 - User OneSignal ID:', playerId);
-            } catch (method1Error) {
-              console.log('⚠️ Method 1 failed:', method1Error);
-            }
-
-            // Method 2: Get from PushSubscription ID
-            if (!playerId) {
-              try {
-                playerId = await oneSignalInstance.User.pushSubscription.id;
-                console.log('🎯 Method 2 - PushSubscription ID:', playerId);
-              } catch (method2Error) {
-                console.log('⚠️ Method 2 failed:', method2Error);
+              if (playerId) {
+                console.log('✅ Got Player ID:', playerId);
+                break;
               }
+            } catch (error) {
+              console.log(`⚠️ Attempt ${attempts} failed:`, error);
             }
 
-            // Method 3: Get from User's external ID
-            if (!playerId) {
-              try {
-                playerId = await oneSignalInstance.User.externalId;
-                console.log('🎯 Method 3 - External ID:', playerId);
-              } catch (method3Error) {
-                console.log('⚠️ Method 3 failed:', method3Error);
-              }
-            }
-
-            // Method 4: Get from User's email
-            if (!playerId) {
-              try {
-                playerId = await oneSignalInstance.User.email;
-                console.log('🎯 Method 4 - Email:', playerId);
-              } catch (method4Error) {
-                console.log('⚠️ Method 4 failed:', method4Error);
-              }
-            }
-
-            if (playerId) {
-              console.log('✅ Using OneSignal Player ID:', playerId);
-              await saveSubscriptionId(playerId);
-              return;
-            } else {
-              console.log('⚠️ All OneSignal methods failed to get Player ID');
-              console.log('🔄 Falling back to IndexedDB method...');
-            }
-          } else {
-            console.log('⚠️ Push notifications not supported');
+            // Wait between attempts, longer on mobile
+            await new Promise(resolve => setTimeout(resolve, isMobile ? 2000 : 1000));
           }
-        } catch (oneSignalError) {
-          console.log('❌ OneSignal direct method failed:', oneSignalError);
-          console.log('🔄 Falling back to IndexedDB method...');
+
+          if (playerId) {
+            await saveSubscriptionId(playerId);
+            return;
+          }
         }
-      } else {
-        console.log('⚠️ OneSignal not available, trying IndexedDB...');
       }
 
-      // Fallback to IndexedDB method
-      console.log('🗄️ Trying IndexedDB method...');
+      // Fallback to IndexedDB with mobile-specific handling
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for IndexedDB to be ready
       const subscriptionId = await getSubscriptionIdFromIndexedDB();
-      console.log('✅ Got Subscription ID from IndexedDB:', subscriptionId);
       await saveSubscriptionId(subscriptionId);
+
     } catch (e) {
       console.error('❌ Failed to get or save Subscription ID:', e);
-      console.error('❌ Error details:', {
-        message: e instanceof Error ? e.message : String(e),
-        stack: e instanceof Error ? e.stack : undefined,
-        name: e instanceof Error ? e.name : 'Unknown'
-      });
       setNotifEnabled(false);
     }
   };
@@ -689,6 +644,21 @@ export default function ChatPage() {
       setNotifEnabled(false);
     }
   };
+
+  const debugMobileEnvironment = () => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('📱 Mobile detected:', isMobile);
+    console.log('🌐 User Agent:', navigator.userAgent);
+    console.log('🗄️ IndexedDB available:', !!window.indexedDB);
+    console.log('🔔 Notification API available:', 'Notification' in window);
+    console.log('🔔 Service Worker available:', 'serviceWorker' in navigator);
+    console.log('🔔 Current notification permission:', Notification.permission);
+  };
+
+  // Call this when your component mounts
+  useEffect(() => {
+    debugMobileEnvironment();
+  }, []);
 
   // Add this function after saveSubscriptionId
   const requestNotificationPermission = async () => {
@@ -1101,6 +1071,7 @@ export default function ChatPage() {
             fileName: message.fileName,
             fileSize: message.fileSize,
             isRead: false,
+            createdAt: message.createdAt || new Date().toISOString(),
             ...linkMetadata
           };
           setMessages(prev => [...prev, newMessage]);
@@ -1123,6 +1094,7 @@ export default function ChatPage() {
               fileName: message.fileName,
               fileSize: message.fileSize,
               isRead: false,
+              createdAt: message.createdAt || new Date().toISOString(),
               ...meta,
             };
             setMessages(prev => [...prev, newMessage]);
@@ -1137,6 +1109,7 @@ export default function ChatPage() {
               fileName: message.fileName,
               fileSize: message.fileSize,
               isRead: false,
+              createdAt: message.createdAt || new Date().toISOString(),
             };
             setMessages(prev => [...prev, newMessage]);
           });
@@ -1152,6 +1125,7 @@ export default function ChatPage() {
             fileName: message.fileName,
             fileSize: message.fileSize,
             isRead: false,
+            createdAt: message.createdAt || new Date().toISOString(),
           };
           setMessages(prev => [...prev, newMessage]);
         }
@@ -1625,11 +1599,14 @@ export default function ChatPage() {
       senderId: "me",
       receiverId: selectedContact.id,
       content: newMessage,
-      timestamp: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+      }),
       type: messageType,
-      // 🔥 NEW: Set initial read status for new messages
       isRead: false,
-      // 🔥 NEW: Add link metadata if it's a link message
+      createdAt: new Date().toISOString(), // ✅ always include this
       ...linkMetadata
     };
 
@@ -2754,6 +2731,8 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
     alert('Video call controls tested. Check console for logs.');
   }
 
+  console.log("messages", messages)
+
   const getDateLabel = (dateString: string) => {
     const msgDate = new Date(dateString);
     const today = new Date();
@@ -2770,16 +2749,43 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
     return msgDate.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
   };
 
-  const groupMessagesByDate = (messages: Message[]) => {
-    console.log("Messages:", messages);
+  const groupMessagesByDate = (messages: any[]) => {
+    return messages.reduce((groups, message) => {
+      let dateLabel = "Unknown";
 
-    return messages.reduce((acc, msg) => {
-      const dateLabel = getDateLabel(new Date(msg.createdAt).toISOString());
-      if (!acc[dateLabel]) acc[dateLabel] = [];
-      acc[dateLabel].push(msg);
-      return acc;
-    }, {} as Record<string, Message[]>);
+      // ✅ Use createdAt for grouping
+      if (message.createdAt) {
+        const date = new Date(message.createdAt);
+
+        if (!isNaN(date.getTime())) {
+          const today = new Date();
+          const yesterday = new Date();
+          yesterday.setDate(today.getDate() - 1);
+
+          if (date.toDateString() === today.toDateString()) {
+            dateLabel = "Today";
+          } else if (date.toDateString() === yesterday.toDateString()) {
+            dateLabel = "Yesterday";
+          } else {
+            dateLabel = date.toLocaleDateString(undefined, {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            });
+          }
+        }
+      }
+
+      if (!groups[dateLabel]) {
+        groups[dateLabel] = [];
+      }
+      groups[dateLabel].push(message);
+
+      return groups;
+    }, {} as Record<string, any[]>);
   };
+
+
 
 
   // 🔥 NEW: Reconnection popup component
@@ -3280,10 +3286,12 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
             )}
             onScroll={handleScroll}
           >
-            <div className={cn(
-              "p-4 space-y-3",
-              isKeyboardVisible && "pb-20"
-            )}>
+            <div
+              className={cn(
+                "p-4 space-y-3",
+                isKeyboardVisible && "pb-20"
+              )}
+            >
               {isLoadingMessages || !messagesReady ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mr-2 text-blue-500" />
@@ -3296,9 +3304,12 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                     <MessageSquare className="h-10 w-10 text-blue-500" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No messages yet
+                  </h3>
                   <p className="text-sm text-gray-500 max-w-sm">
-                    Say hello to {selectedContact?.name || 'your contact'} and start your conversation!
+                    Say hello to {selectedContact?.name || "your contact"} and start your
+                    conversation!
                   </p>
                 </div>
               ) : (
@@ -3315,27 +3326,38 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     {msgs.map((message) => (
                       <div
                         key={message.id}
-                        className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
+                        className={cn(
+                          "flex mb-2",
+                          message.senderId === "me" ? "justify-end" : "justify-start"
+                        )}
                       >
                         <div
                           className={cn(
-                            "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative max-w-xs",
+                            "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative max-w-xs sm:max-w-sm md:max-w-md break-words whitespace-pre-wrap",
                             message.senderId === "me"
                               ? "bg-blue-500 text-white rounded-br-md"
                               : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
                           )}
                         >
-                          {/* Your existing message rendering code */}
                           {message.type === "text" && (
                             <div className="relative pb-4">
-                              <p className={cn("text-sm", message.senderId === "me" ? "pr-20" : "pr-16")}>
+                              <p
+                                className={cn(
+                                  "text-sm break-words whitespace-pre-wrap",
+                                  message.senderId === "me" ? "pr-5" : "pr-16"
+                                )}
+                              >
                                 {message.content}
                               </p>
                               <div className="absolute bottom-0 right-0 flex items-center space-x-1">
-                                <span className={cn(
-                                  "text-xs whitespace-nowrap",
-                                  message.senderId === "me" ? "text-white/70" : "text-gray-500"
-                                )}>
+                                <span
+                                  className={cn(
+                                    "text-xs whitespace-nowrap",
+                                    message.senderId === "me"
+                                      ? "text-white/70"
+                                      : "text-gray-500"
+                                  )}
+                                >
                                   {message.timestamp}
                                 </span>
                               </div>
@@ -3346,10 +3368,10 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                     ))}
                   </div>
                 ))
-
               )}
               <div ref={messagesEndRef} className="h-4" />
             </div>
+
           </ScrollArea>
 
           {/* Scroll to Bottom Button */}

@@ -20,6 +20,7 @@ const Session = require('./models/sessionModel');
 const app = express();
 const server = http.createServer(app);
 const allowedOrigins = [
+  "http://10.133.199.31:3000",
   "http://192.168.0.149:3000",
   "http://localhost:3000",
   "https://t.hous4.com/",
