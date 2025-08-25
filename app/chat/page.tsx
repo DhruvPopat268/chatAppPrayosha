@@ -1823,13 +1823,18 @@ export default function ChatPage() {
             senderId: isCurrentUser ? "me" : senderId,
             receiverId: isCurrentUser ? contactId : currentUser.id,
             content: msg.content,
-            timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }),
+            createdAt: msg.createdAt, // ✅ preserve backend date for grouping
+            timestamp: new Date(msg.createdAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true
+            }),
             type: messageType,
             fileName: msg.fileName,
             fileSize: msg.fileSize,
-            // 🔥 NEW: Include read status from backend
+            // 🔥 include read status from backend
             isRead: msg.isRead || false,
-            // 🔥 NEW: Add link metadata if it's a link message
+            // 🔥 add link metadata if it's a link message
             ...linkMetadata
           }
         }))
@@ -2749,6 +2754,34 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
     alert('Video call controls tested. Check console for logs.');
   }
 
+  const getDateLabel = (dateString: string) => {
+    const msgDate = new Date(dateString);
+    const today = new Date();
+
+    const isToday = msgDate.toDateString() === today.toDateString();
+
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const isYesterday = msgDate.toDateString() === yesterday.toDateString();
+
+    if (isToday) return "Today";
+    if (isYesterday) return "Yesterday";
+
+    return msgDate.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+  };
+
+  const groupMessagesByDate = (messages: Message[]) => {
+    console.log("Messages:", messages);
+
+    return messages.reduce((acc, msg) => {
+      const dateLabel = getDateLabel(new Date(msg.createdAt).toISOString());
+      if (!acc[dateLabel]) acc[dateLabel] = [];
+      acc[dateLabel].push(msg);
+      return acc;
+    }, {} as Record<string, Message[]>);
+  };
+
+
   // 🔥 NEW: Reconnection popup component
   const ReconnectionPopup = () => {
     if (!showReconnectPopup) return null;
@@ -3269,268 +3302,51 @@ Permissions: ${debugInfo.permissions ? JSON.stringify(debugInfo.permissions, nul
                   </p>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
-                  >
-                    <div
-                      className={cn(
-                        "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative max-w-xs",
-                        message.senderId === "me"
-                          ? "bg-blue-500 text-white rounded-br-md"
-                          : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
-                      )}
-                    >
-                      {message.type === "text" && (
-                        <div className="relative pb-4">
-                          <p className={cn(
-                            "text-sm",
-                            message.senderId === "me" ? "pr-20" : "pr-16" // Increased padding for sender messages
-                          )}>
-                            {message.content}
-                          </p>
-                          <div className="absolute bottom-0 right-0 flex items-center space-x-1">
-                            <span className={cn(
-                              "text-xs whitespace-nowrap",
-                              message.senderId === "me" ? "text-white/70" : "text-gray-500"
-                            )}>
-                              {message.timestamp}
-                            </span>
-                            {message.senderId === "me" && (
-                              <div className="flex items-center flex-shrink-0">
-                                {messageReadStatus.get(message.id) ? (
-                                  <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {message.type === "link" && (
-                        <div className="relative pb-4">
-                          <div className="space-y-2">
-                            <p className={cn(
-                              "text-sm",
-                              message.senderId === "me" ? "pr-20" : "pr-16" // Increased padding for sender messages
-                            )}>
-                              {message.content}
-                            </p>
-                            {message.linkUrl && (
-                              <div className={cn(
-                                "rounded-lg p-3 border",
-                                message.senderId === "me"
-                                  ? "bg-white/10 border-white/20"
-                                  : "bg-gray-50 border-gray-200"
-                              )}>
-                                <a
-                                  href={message.linkUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={cn(
-                                    "block rounded transition-colors",
-                                    message.senderId === "me"
-                                      ? "hover:bg-white/5"
-                                      : "hover:bg-gray-100"
-                                  )}
-                                >
-                                  <div className="flex items-start space-x-3">
-                                    {message.linkImage && (
-                                      <img
-                                        src={message.linkImage}
-                                        alt="Link preview"
-                                        className="w-16 h-16 object-cover rounded flex-shrink-0"
-                                      />
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <h4 className={cn(
-                                        "text-sm font-medium truncate",
-                                        message.senderId === "me" ? "text-white" : "text-gray-900"
-                                      )}>
-                                        {message.linkTitle || 'Link'}
-                                      </h4>
-                                      <p className={cn(
-                                        "text-xs mt-1 line-clamp-2",
-                                        message.senderId === "me" ? "text-white/70" : "text-gray-600"
-                                      )}>
-                                        {message.linkDescription || message.linkUrl}
-                                      </p>
-                                      <div className="flex items-center mt-2">
-                                        <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                                        <span className={cn(
-                                          "text-xs",
-                                          message.senderId === "me" ? "text-white/60" : "text-gray-500"
-                                        )}>
-                                          {new URL(message.linkUrl).hostname}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                          <div className="absolute bottom-0 right-0 flex items-center space-x-1">
-                            <span className={cn(
-                              "text-xs whitespace-nowrap",
-                              message.senderId === "me" ? "text-white/70" : "text-gray-500"
-                            )}>
-                              {message.timestamp}
-                            </span>
-                            {message.senderId === "me" && (
-                              <div className="flex items-center flex-shrink-0">
-                                {messageReadStatus.get(message.id) ? (
-                                  <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {message.type === "image" && message.content && (
-                        <div className="relative">
-                          <img
-                            src={message.content}
-                            alt="Shared image"
-                            className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity mb-4"
-                            style={{ maxWidth: 240, maxHeight: 320 }}
-                            onClick={() => setPreviewImage(message.content)}
-                          />
-                          <div className="absolute bottom-0 right-0 flex items-center space-x-1 bg-black/20 rounded px-1 py-0.5">
-                            <span className="text-xs text-white whitespace-nowrap">
-                              {message.timestamp}
-                            </span>
-                            {message.senderId === "me" && (
-                              <div className="flex items-center flex-shrink-0">
-                                {messageReadStatus.get(message.id) ? (
-                                  <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {message.type === "file" && message.content && (
-                        <div className="relative pb-4">
-                          <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
-                            <File className="h-6 w-6 text-blue-500 flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              {(() => {
-                                // Safer approach: use the original URL and append attname for nicer filename
-                                const downloadUrl = (() => {
-                                  try {
-                                    if (message.fileName) {
-                                      const url = new URL(message.content);
-                                      url.searchParams.set('attname', message.fileName);
-                                      return url.toString();
-                                    }
-                                  } catch { }
-                                  return message.content;
-                                })();
-                                return (
-                                  <a
-                                    href={downloadUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    download={message.fileName || true}
-                                    className="text-sm font-medium underline hover:no-underline block truncate"
-                                  >
-                                    {message.fileName || 'Download file'}
-                                  </a>
-                                );
-                              })()}
-                              <p className="text-xs text-gray-500 mt-1">{message.fileSize}</p>
-                            </div>
-                            <div className="flex-shrink-0">
-                              {(() => {
-                                const downloadUrl = (() => {
-                                  try {
-                                    if (message.fileName) {
-                                      const url = new URL(message.content);
-                                      url.searchParams.set('attname', message.fileName);
-                                      return url.toString();
-                                    }
-                                  } catch { }
-                                  return message.content;
-                                })();
-                                return (
-                                  <a
-                                    href={downloadUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    download={message.fileName || true}
-                                    className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                  >
-                                    Download
-                                  </a>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                          <div className="absolute bottom-0 right-0 flex items-center space-x-1">
-                            <span className={cn(
-                              "text-xs whitespace-nowrap",
-                              message.senderId === "me" ? "text-white/70" : "text-gray-500"
-                            )}>
-                              {message.timestamp}
-                            </span>
-                            {message.senderId === "me" && (
-                              <div className="flex items-center flex-shrink-0">
-                                {messageReadStatus.get(message.id) ? (
-                                  <div className="flex space-x-0.5">
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                    <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                ) : (
-                                  <svg className="w-3 h-3 text-white/70" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                Object.entries(groupMessagesByDate(messages)).map(([dateLabel, msgs]) => (
+                  <div key={dateLabel}>
+                    {/* Date Separator */}
+                    <div className="flex justify-center my-3">
+                      <span className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-full">
+                        {dateLabel}
+                      </span>
                     </div>
+
+                    {/* Messages for this date */}
+                    {msgs.map((message) => (
+                      <div
+                        key={message.id}
+                        className={cn("flex mb-2", message.senderId === "me" ? "justify-end" : "justify-start")}
+                      >
+                        <div
+                          className={cn(
+                            "chat-message-bubble px-3 py-2 rounded-2xl shadow-sm relative max-w-xs",
+                            message.senderId === "me"
+                              ? "bg-blue-500 text-white rounded-br-md"
+                              : "bg-white text-gray-900 rounded-bl-md border border-gray-200"
+                          )}
+                        >
+                          {/* Your existing message rendering code */}
+                          {message.type === "text" && (
+                            <div className="relative pb-4">
+                              <p className={cn("text-sm", message.senderId === "me" ? "pr-20" : "pr-16")}>
+                                {message.content}
+                              </p>
+                              <div className="absolute bottom-0 right-0 flex items-center space-x-1">
+                                <span className={cn(
+                                  "text-xs whitespace-nowrap",
+                                  message.senderId === "me" ? "text-white/70" : "text-gray-500"
+                                )}>
+                                  {message.timestamp}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))
+
               )}
               <div ref={messagesEndRef} className="h-4" />
             </div>
